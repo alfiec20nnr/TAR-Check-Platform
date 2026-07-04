@@ -1,0 +1,45 @@
+# Risk-scoring configuration. Tune weights and thresholds here — no code
+# changes required (there are no admin accounts in the MVP).
+
+# Base severity weight per finding category (0-100).
+categories:
+  sanctions: 100
+  disqualification: 90
+  insolvency: 70
+  regulatory: 70
+  adverse_media: 20      # general negative media; escalated by keywords below
+  directorship: 5        # informational — directorships are not adverse per se
+  web: 5
+
+# Adverse-media escalation: if a finding's title/description contains any of
+# these terms, its weight is raised to `weight` (serious adverse media).
+media_keywords:
+  serious:
+    weight: 60
+    terms:
+      - fraud
+      - money laundering
+      - bribery
+      - corruption
+      - embezzlement
+      - terrorism
+      - trafficking
+      - sanctions violation
+      - insider trading
+      - tax evasion
+
+# Findings below this identity-match confidence (%) are excluded from scoring.
+confidence_threshold: 40
+
+# Overall score = strongest weighted finding + secondary_factor * sum of the
+# rest, capped at `cap`. Each finding's weighted score = weight * confidence%.
+aggregation:
+  secondary_factor: 0.25
+  cap: 100
+
+# Risk level thresholds (score >= value).
+thresholds:
+  low: 0
+  medium: 25
+  high: 50
+  critical: 80

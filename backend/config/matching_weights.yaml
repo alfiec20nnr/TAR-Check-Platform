@@ -1,0 +1,50 @@
+# Identity-matching weights. Each signal contributes to the confidence score
+# only when both the search subject and the candidate record carry it; weights
+# are re-normalised over the available signals.
+weights:
+  name: 0.55
+  date_of_birth: 0.25
+  country: 0.20
+
+# Score awarded per signal outcome (0-100 scale).
+scores:
+  dob_exact: 100
+  dob_year_only: 60
+  country_match: 100
+
+# A hard DOB mismatch caps overall confidence at this value — two different
+# birth dates almost certainly means two different people.
+dob_mismatch_cap: 30
+
+# Nickname/variant equivalences applied before fuzzy name comparison.
+name_variants:
+  william: [bill, will, billy, liam]
+  robert: [rob, bob, bobby]
+  richard: [rick, dick, richie]
+  elizabeth: [liz, beth, lizzie, eliza]
+  margaret: [maggie, peggy, meg]
+  james: [jim, jimmy, jamie]
+  michael: [mike, mick, mickey]
+  edward: [ed, eddie, ted, ned]
+  katherine: [kate, katie, kathy, cat]
+  catherine: [kate, katie, cathy, cat]
+  anthony: [tony]
+  alexander: [alex, sandy, xander]
+  christopher: [chris, kit]
+  nicholas: [nick, nicky]
+  jonathan: [jon, jonny]
+  joseph: [joe, joey]
+  thomas: [tom, tommy]
+  charles: [charlie, chuck]
+  daniel: [dan, danny]
+  samantha: [sam]
+  samuel: [sam, sammy]
+  benjamin: [ben, benny]
+  matthew: [matt]
+  andrew: [andy, drew]
+  steven: [steve]
+  stephen: [steve]
+  patricia: [pat, patty, trish]
+  jennifer: [jen, jenny]
+  susan: [sue, susie]
+  deborah: [deb, debbie]

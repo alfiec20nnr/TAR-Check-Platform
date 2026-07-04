@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Adverse Intelligence Report {{ reference }}</title>
+<style>
+  body { font-family: Georgia, 'Times New Roman', serif; color: #1d2733; margin: 40px; }
+  h1 { font-size: 24px; border-bottom: 3px solid #14324f; padding-bottom: 8px; }
+  h2 { font-size: 17px; color: #14324f; margin-top: 28px; border-bottom: 1px solid #cfd8e3; padding-bottom: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 13px; }
+  th, td { border: 1px solid #cfd8e3; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #eef2f7; }
+  .meta { color: #5a6b7f; font-size: 12px; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 4px; color: #fff; font-weight: bold; font-family: Arial, sans-serif; font-size: 13px; }
+  .badge.low { background: #2e7d32; }
+  .badge.medium { background: #f9a825; color: #1d2733; }
+  .badge.high { background: #ef6c00; }
+  .badge.critical { background: #c62828; }
+  .ai-box { background: #f6f8fb; border: 1px solid #cfd8e3; border-left: 4px solid #14324f; padding: 12px 16px; }
+  .disclaimer { font-size: 11px; color: #5a6b7f; border-top: 1px solid #cfd8e3; margin-top: 30px; padding-top: 10px; }
+  ul { margin: 6px 0; padding-left: 20px; }
+  a { color: #14324f; }
+</style>
+</head>
+<body>
+
+<h1>Adverse Intelligence Report</h1>
+<p class="meta">
+  Reference: <strong>{{ reference }}</strong> &nbsp;|&nbsp;
+  Generated: {{ generated_at }} &nbsp;|&nbsp;
+  Adverse Intelligence Platform (MVP)
+</p>
+
+<h2>1. Executive Summary</h2>
+<p>
+  Overall risk:
+  <span class="badge {{ risk.level }}">{{ risk.level | upper }} ({{ risk.score }})</span>
+</p>
+<div class="ai-box">
+  <p><strong>{% if ai.is_fallback %}Automated summary (non-AI){% else %}AI-generated summary{% endif %}</strong> — this text is generated commentary and must be read alongside the verified records in section 4.</p>
+  <p>{{ ai.content.executive_summary }}</p>
+</div>
+
+<h2>2. Search Parameters</h2>
+<table>
+  <tr><th>Full name</th><td>{{ subject.full_name }}</td></tr>
+  <tr><th>Date of birth</th><td>{{ subject.date_of_birth or "Not provided" }}</td></tr>
+  <tr><th>Country</th><td>{{ subject.country or "Not provided" }}</td></tr>
+  <tr><th>Sources searched</th><td>{{ sources_searched | join(", ") }}</td></tr>
+  <tr><th>Search duration</th><td>{{ duration_ms }} ms</td></tr>
+</table>
+
+<h2>3. Risk Score</h2>
+<p>Score <strong>{{ risk.score }}</strong> / 100 — level <strong>{{ risk.level | upper }}</strong>.
+Factors counted (findings at or above the confidence threshold):</p>
+{% if risk.factors %}
+<table>
+  <tr><th>Finding</th><th>Category</th><th>Source</th><th>Match confidence</th><th>Weighted score</th></tr>
+  {% for f in risk.factors %}
+  <tr>
+    <td>{{ f.title }}</td>
+    <td>{{ f.category | replace("_", " ") }}{% if f.escalated %} (escalated){% endif %}</td>
+    <td>{{ f.source }}</td>
+    <td>{{ f.confidence }}%</td>
+    <td>{{ f.weighted_score }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No findings met the confidence threshold for risk scoring.</p>
+{% endif %}
+
+<h2>4. Verified Records &amp; Confidence Scores</h2>
+<p class="meta">Records as returned by each data source. Confidence is the identity-match likelihood that the record refers to the search subject.</p>
+{% if results %}
+<table>
+  <tr><th>Source</th><th>Category</th><th>Record</th><th>Date</th><th>Confidence</th><th>Link</th></tr>
+  {% for r in results %}
+  <tr>
+    <td>{{ r.source_name }}</td>
+    <td>{{ r.category | replace("_", " ") }}</td>
+    <td><strong>{{ r.title }}</strong>{% if r.description %}<br>{{ r.description }}{% endif %}</td>
+    <td>{{ r.event_date or "—" }}</td>
+    <td>{{ r.confidence }}%</td>
+    <td>{% if r.url %}<a href="{{ r.url }}">source</a>{% else %}—{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No records were returned by the sources searched.</p>
+{% endif %}
+
+<h2>5. Timeline</h2>
+{% if ai.content.timeline %}
+<table>
+  <tr><th>Date</th><th>Event</th><th>Source</th></tr>
+  {% for t in ai.content.timeline %}
+  <tr><td>{{ t.date }}</td><td>{{ t.event }}</td><td>{{ t.source }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No dated events identified.</p>
+{% endif %}
+
+<h2>6. Key Concerns</h2>
+{% if ai.content.key_concerns %}
+<ul>{% for c in ai.content.key_concerns %}<li>{{ c }}</li>{% endfor %}</ul>
+{% else %}<p>None identified.</p>{% endif %}
+
+<h2>7. Recurring Themes &amp; Legal Outcomes</h2>
+{% if ai.content.recurring_themes %}
+<p><strong>Themes:</strong></p>
+<ul>{% for t in ai.content.recurring_themes %}<li>{{ t }}</li>{% endfor %}</ul>
+{% endif %}
+{% if ai.content.legal_outcomes %}
+<p><strong>Legal outcomes:</strong></p>
+<ul>{% for o in ai.content.legal_outcomes %}<li>{{ o }}</li>{% endfor %}</ul>
+{% endif %}
+{% if not ai.content.recurring_themes and not ai.content.legal_outcomes %}
+<p>None identified.</p>
+{% endif %}
+
+<h2>8. Recommendations</h2>
+{% if ai.content.recommendations %}
+<ul>{% for rec in ai.content.recommendations %}<li>{{ rec }}</li>{% endfor %}</ul>
+{% else %}<p>None.</p>{% endif %}
+
+<h2>9. Appendices — Source Execution</h2>
+<table>
+  <tr><th>Connector</th><th>Status</th><th>Findings</th><th>Duration</th></tr>
+  {% for s in connector_stats %}
+  <tr><td>{{ s.connector }}</td><td>{{ s.status }}</td><td>{{ s.findings }}</td><td>{{ s.duration_ms }} ms</td></tr>
+  {% endfor %}
+</table>
+
+<div class="disclaimer">
+  <p><strong>Disclaimer.</strong> This report aggregates publicly available information for
+  legitimate business due diligence. Records may relate to different individuals with
+  similar names — confidence scores indicate likelihood only. Allegations reported in the
+  media are not findings of fact. AI-generated content is clearly marked and must be
+  verified against the linked original sources before any decision is taken.</p>
+  <p>Report reference {{ reference }} — generated {{ generated_at }}.</p>
+</div>
+
+</body>
+</html>
