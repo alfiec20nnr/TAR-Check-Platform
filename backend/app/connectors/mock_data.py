@@ -4,21 +4,29 @@ Mock mode lets the entire pipeline run end-to-end with no external API keys.
 The profile returned for a subject is deterministic (hash of the name), so the
 same search always produces the same results — useful for demos and tests.
 
-A given name lands in one of four demo risk profiles:
-  0: clean          — only web/press mentions
-  1: media          — adverse media coverage
-  2: insolvency     — bankruptcy + directorships + media
-  3: severe         — sanctions match + disqualification + serious media
+Fixture records are SIMULATED and clearly marked as such downstream (demo
+banner in the UI and reports). The profile distribution mirrors reality:
+most individuals are clean, adverse findings are the exception.
+
+A given name lands in one of four demo risk profiles (hash % 10):
+  0-6: clean        — only web/press mentions                     (70%)
+  7:   media        — adverse media coverage                      (10%)
+  8:   insolvency   — bankruptcy + directorships + media          (10%)
+  9:   severe       — sanctions match + disqualification + media  (10%)
 """
 
 import hashlib
 
 from app.connectors.base import Category, Finding, SearchSubject
 
+CLEAN, MEDIA, INSOLVENCY, SEVERE = 0, 1, 2, 3
+
+_BUCKET_TO_PROFILE = {7: MEDIA, 8: INSOLVENCY, 9: SEVERE}
+
 
 def profile_for(subject: SearchSubject) -> int:
     digest = hashlib.sha256(subject.full_name.strip().lower().encode()).hexdigest()
-    return int(digest, 16) % 4
+    return _BUCKET_TO_PROFILE.get(int(digest, 16) % 10, CLEAN)
 
 
 def _country(subject: SearchSubject) -> str:
@@ -26,6 +34,9 @@ def _country(subject: SearchSubject) -> str:
 
 
 def google_mock(subject: SearchSubject) -> list[Finding]:
+    # Like the real connector, web results are unstructured mentions: no
+    # subject_name is attributed, so identity matching applies its low
+    # mention-confidence ceiling.
     name = subject.full_name
     findings = [
         Finding(
@@ -34,8 +45,6 @@ def google_mock(subject: SearchSubject) -> list[Finding]:
             title=f"{name} — LinkedIn profile",
             description=f"Professional profile page for {name}.",
             url="https://www.linkedin.com/in/example",
-            subject_name=name,
-            location=_country(subject),
             raw={"mock": True},
         ),
         Finding(
@@ -45,11 +54,10 @@ def google_mock(subject: SearchSubject) -> list[Finding]:
             description=f"{name} appeared as a panellist at a trade conference.",
             url="https://example.com/conference",
             date="2024-06-12",
-            subject_name=name,
             raw={"mock": True},
         ),
     ]
-    if profile_for(subject) >= 2:
+    if profile_for(subject) >= INSOLVENCY:
         findings.append(
             Finding(
                 source="google_search",
@@ -58,7 +66,6 @@ def google_mock(subject: SearchSubject) -> list[Finding]:
                 description=f"A county court listing includes the name {name}.",
                 url="https://example.com/court-listing",
                 date="2023-11-02",
-                subject_name=name,
                 raw={"mock": True},
             )
         )
@@ -69,7 +76,7 @@ def news_mock(subject: SearchSubject) -> list[Finding]:
     name = subject.full_name
     p = profile_for(subject)
     findings: list[Finding] = []
-    if p >= 1:
+    if p >= MEDIA:
         findings.append(
             Finding(
                 source="news_api",
@@ -81,11 +88,10 @@ def news_mock(subject: SearchSubject) -> list[Finding]:
                 ),
                 url="https://news.example.com/regulator-scrutiny",
                 date="2024-03-18",
-                subject_name=name,
                 raw={"mock": True},
             )
         )
-    if p == 3:
+    if p == SEVERE:
         findings.append(
             Finding(
                 source="news_api",
@@ -98,7 +104,6 @@ def news_mock(subject: SearchSubject) -> list[Finding]:
                 ),
                 url="https://news.example.com/aml-investigation",
                 date="2024-09-30",
-                subject_name=name,
                 raw={"mock": True},
             )
         )
@@ -109,7 +114,7 @@ def companies_house_mock(subject: SearchSubject) -> list[Finding]:
     name = subject.full_name
     p = profile_for(subject)
     findings = []
-    if p >= 1:
+    if p >= MEDIA:
         findings.append(
             Finding(
                 source="companies_house",
@@ -124,7 +129,7 @@ def companies_house_mock(subject: SearchSubject) -> list[Finding]:
                 raw={"mock": True, "company": "Example Trading Ltd", "role": "director"},
             )
         )
-    if p == 3:
+    if p == SEVERE:
         findings.append(
             Finding(
                 source="companies_house",
@@ -146,7 +151,7 @@ def companies_house_mock(subject: SearchSubject) -> list[Finding]:
 
 def insolvency_mock(subject: SearchSubject) -> list[Finding]:
     name = subject.full_name
-    if profile_for(subject) >= 2:
+    if profile_for(subject) >= INSOLVENCY:
         return [
             Finding(
                 source="insolvency_register",
@@ -166,7 +171,10 @@ def insolvency_mock(subject: SearchSubject) -> list[Finding]:
 
 def sanctions_mock(subject: SearchSubject) -> list[Finding]:
     name = subject.full_name
-    if profile_for(subject) == 3:
+    if profile_for(subject) == SEVERE:
+        # A sanctions list entry carries its own identity data — it does not
+        # corroborate the subject's DOB, so confidence must reflect a
+        # name-similarity match only.
         return [
             Finding(
                 source="uk_sanctions",
@@ -179,7 +187,6 @@ def sanctions_mock(subject: SearchSubject) -> list[Finding]:
                 url="https://www.gov.uk/government/publications/the-uk-sanctions-list",
                 date="2023-04-05",
                 subject_name=name,
-                date_of_birth=subject.date_of_birth,
                 raw={"mock": True, "regime": "Global Anti-Corruption"},
             )
         ]
@@ -188,7 +195,7 @@ def sanctions_mock(subject: SearchSubject) -> list[Finding]:
 
 def fca_mock(subject: SearchSubject) -> list[Finding]:
     name = subject.full_name
-    if profile_for(subject) >= 2:
+    if profile_for(subject) >= INSOLVENCY:
         return [
             Finding(
                 source="fca_warning_list",

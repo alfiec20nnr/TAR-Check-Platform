@@ -22,6 +22,12 @@ cp .env.example .env
 docker compose up --build
 ```
 
+> ⚠️ **Demo mode**: while `MOCK_CONNECTORS=true`, every result is *simulated
+> fixture data* — nothing shown relates to any real person. The UI and every
+> generated report display a demo-mode banner. Roughly 70% of names produce a
+> clean profile and 30% land in one of three deterministic adverse demo
+> profiles. To search real sources, follow "Going live" below.
+
 Then open:
 
 | URL | What |
@@ -82,13 +88,31 @@ cd backend && pytest --cov=app          # 56 tests, ~87% coverage
 cd frontend && npm test                 # component tests (vitest)
 ```
 
+## Identity-match accuracy
+
+Every result carries a confidence percentage with an honest ceiling per
+evidence tier — a name similarity alone is never presented as a confirmed
+identity:
+
+| Band | Confidence | Meaning |
+|---|---|---|
+| Strong | 85%+ | Corroborated by independent signals (e.g. DOB, country) |
+| Probable | 65–84% | Good match, limited corroboration |
+| Possible | 40–64% | Name-only or text-mention match — may be a different person |
+| Weak | < 40% | Excluded from risk scoring |
+
+Records that merely *mention* the name in unstructured text (web pages, news
+articles) are capped at 55%; records with a source-attributed name but no
+corroborating DOB/country are capped at 72%; a hard DOB mismatch caps at 30%.
+All ceilings are tunable in `backend/config/matching_weights.yaml`.
+
 ## Tuning without code changes
 
 - `backend/config/risk_weights.yaml` — category severity weights, adverse-media
   keyword escalation, confidence threshold, aggregation, and Low/Medium/High/
   Critical thresholds.
 - `backend/config/matching_weights.yaml` — identity-matching signal weights,
-  DOB-mismatch cap, and name-variant equivalences.
+  confidence ceilings (`caps`), DOB-mismatch cap, and name-variant equivalences.
 
 ## Documentation
 

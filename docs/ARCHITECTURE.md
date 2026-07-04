@@ -35,7 +35,7 @@ message broker — the PostgreSQL database is the only shared infrastructure.
 |---|---|---|
 | Search Module | `app/api/routes/searches.py` | Validates input, creates the job, exposes status |
 | Connector Framework | `app/connectors/` | `BaseConnector` (retries, rate limiting, timing, failure logging) + registry; concurrent execution via `asyncio.gather` |
-| Identity Matching Engine | `app/services/identity_matching.py` | Weighted name/DOB/country matching → confidence % per record |
+| Identity Matching Engine | `app/services/identity_matching.py` | Weighted name/DOB/country matching → confidence % per record, with evidence-tier ceilings (unstructured mention 55%, uncorroborated name 72%, DOB mismatch 30%) |
 | Risk Scoring Engine | `app/services/risk_scoring.py` | Configurable category weights + media-keyword escalation → 0-100 score and level |
 | AI Summarisation | `app/services/ai_summary.py` | Claude structured-output summary; template fallback without a key |
 | Report Generator | `app/services/report_generator.py` | JSON + HTML stored; PDF rendered on demand (WeasyPrint) |
@@ -85,7 +85,15 @@ No core pipeline, schema, or API changes are required.
 - **Postgres-backed job queue** instead of Redis/celery: one fewer service, and
   `SKIP LOCKED` gives safe multi-worker semantics at MVP scale.
 - **Mock-connector mode** (`MOCK_CONNECTORS`) makes the entire pipeline runnable
-  and testable with zero external credentials; fixtures are deterministic per name.
+  and testable with zero external credentials; fixtures are deterministic per name,
+  ~70% of names are clean (adverse findings are the exception, mirroring reality),
+  and the UI/reports carry a demo-mode banner so simulated data is never mistaken
+  for real records (`/health` exposes the flag).
+- **Evidence-tier confidence ceilings** — web/news connectors never attribute the
+  searched name back onto a result (`subject_name` stays unset); such records are
+  scored as unstructured mentions with a low confidence ceiling, and even a perfect
+  name match is capped unless independent signals (DOB, country) corroborate it.
+  A name alone is never proof of identity.
 - **Weightings in YAML** (`backend/config/*.yaml`) so risk and matching models are
   tunable without code changes or admin UI.
 - **SQLite for tests** — models avoid Postgres-only types so the test suite runs

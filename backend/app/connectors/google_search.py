@@ -1,9 +1,14 @@
 """Google Programmable Search connector — general public web results."""
 
 import httpx
+from rapidfuzz import fuzz
 
 from app.connectors import mock_data
 from app.connectors.base import BaseConnector, Category, Finding, SearchSubject
+
+# A result must actually mention the subject's name in its title/snippet;
+# anything below this partial-match score is provider noise, not evidence.
+_MENTION_THRESHOLD = 70
 
 
 class GoogleSearchConnector(BaseConnector):
@@ -30,15 +35,23 @@ class GoogleSearchConnector(BaseConnector):
         resp.raise_for_status()
         data = resp.json()
         findings = []
+        target = subject.full_name.lower()
         for item in data.get("items", []):
+            title = item.get("title", "Untitled result")
+            snippet = item.get("snippet") or ""
+            # Web pages only *mention* a name — they do not attribute a record
+            # to a person. subject_name is deliberately left unset so identity
+            # matching treats this as an unstructured mention (low confidence
+            # ceiling) instead of a source-verified name match.
+            if fuzz.token_set_ratio(target, f"{title} {snippet}".lower()) < _MENTION_THRESHOLD:
+                continue
             findings.append(
                 Finding(
                     source=self.name,
                     category=Category.WEB,
-                    title=item.get("title", "Untitled result"),
+                    title=title,
                     description=item.get("snippet"),
                     url=item.get("link"),
-                    subject_name=subject.full_name,
                     raw=item,
                 )
             )

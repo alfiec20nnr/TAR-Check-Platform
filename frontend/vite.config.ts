@@ -9,6 +9,7 @@ export default defineConfig({
     proxy: {
       // Dev convenience: forward API calls to the local FastAPI server.
       "/api": "http://localhost:8000",
+      "/health": "http://localhost:8000",
     },
   },
   test: {

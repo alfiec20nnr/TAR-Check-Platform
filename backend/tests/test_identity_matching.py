@@ -15,11 +15,40 @@ def make_finding(**kwargs) -> Finding:
     return Finding(**defaults)
 
 
-def test_exact_name_high_confidence():
+def test_exact_name_alone_is_capped():
+    """A perfect name match with zero corroboration must not read as certainty."""
     m = matcher()
     subject = SearchSubject(full_name="John Andrew Smith")
     f = make_finding(subject_name="John Andrew Smith")
+    assert m.confidence(subject, f) == m.config.name_only_cap
+
+
+def test_corroborated_match_scores_near_certain():
+    m = matcher()
+    subject = SearchSubject(
+        full_name="John Andrew Smith", date_of_birth="1975-03-02", country="United Kingdom"
+    )
+    f = make_finding(
+        subject_name="John Andrew Smith",
+        date_of_birth="1975-03-02",
+        location="Leeds, United Kingdom",
+    )
     assert m.confidence(subject, f) >= 95
+
+
+def test_unstructured_mention_is_capped_lower():
+    """A record with no attributed name (web/news mention) gets the lowest ceiling."""
+    m = matcher()
+    subject = SearchSubject(full_name="Jane Doe")
+    mention = make_finding(title="Jane Doe speaks at industry conference")
+    assert m.confidence(subject, mention) == m.config.mention_cap
+
+
+def test_text_without_the_name_scores_low():
+    m = matcher()
+    subject = SearchSubject(full_name="Jane Doe")
+    unrelated = make_finding(title="Quarterly market update", description="No names here.")
+    assert m.confidence(subject, unrelated) < 40  # below the risk-scoring threshold
 
 
 def test_name_variant_recognised():
@@ -80,11 +109,12 @@ def test_country_contributes_to_confidence():
     assert m.confidence(subject, matching) > m.confidence(subject, mismatching)
 
 
-def test_missing_signals_are_neutral():
-    """A record with no DOB/location is scored on name alone, not penalised to 0."""
+def test_missing_signals_are_neutral_but_capped():
+    """A record with no DOB/location is scored on name alone — not penalised to 0,
+    but capped because nothing corroborates the identity."""
     m = matcher()
     subject = SearchSubject(
         full_name="Jane Doe", date_of_birth="1980-04-12", country="United Kingdom"
     )
     f = make_finding(subject_name="Jane Doe")
-    assert m.confidence(subject, f) >= 95
+    assert m.confidence(subject, f) == m.config.name_only_cap

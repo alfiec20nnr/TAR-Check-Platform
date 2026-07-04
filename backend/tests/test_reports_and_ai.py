@@ -58,6 +58,16 @@ def test_html_render_includes_key_content():
     assert "non-AI" in html or "AI-generated" in html
 
 
+def test_mock_mode_renders_demo_banner():
+    report = sample_report()
+    report["mock_mode"] = True
+    html = report_generator.render_html(report)
+    assert "DEMO MODE" in html
+    assert "SIMULATED" in html
+    # A real report must not carry the banner.
+    assert "DEMO MODE" not in report_generator.render_html(sample_report())
+
+
 async def test_summariser_falls_back_without_api_key():
     summariser = AiSummariser(Settings(anthropic_api_key=""))
     result = await summariser.summarise(SUBJECT, [])

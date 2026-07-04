@@ -24,15 +24,20 @@ class MatchingConfig:
     weights: dict[str, float]
     scores: dict[str, int]
     dob_mismatch_cap: float
+    name_only_cap: float
+    mention_cap: float
     name_variants: dict[str, list[str]]
 
     @classmethod
     def load(cls, path: Path) -> "MatchingConfig":
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        caps = data.get("caps", {})
         return cls(
             weights=data.get("weights", {}),
             scores=data.get("scores", {}),
             dob_mismatch_cap=float(data.get("dob_mismatch_cap", 30)),
+            name_only_cap=float(caps.get("name_only", 72)),
+            mention_cap=float(caps.get("unstructured_mention", 55)),
             name_variants=data.get("name_variants", {}),
         )
 
@@ -108,6 +113,21 @@ class IdentityMatcher:
         candidates = aliases.get(subject_l, [subject_l])
         return 100.0 if any(alias in location_l for alias in candidates) else 0.0
 
+    def mention_score(self, subject_name: str, finding: Finding) -> float:
+        """Name evidence for a record with no structured subject name.
+
+        Checks whether the subject's name actually appears in the record's
+        title/description. This is weaker evidence than a source-attributed
+        name, so callers cap it at `unstructured_mention`.
+        """
+        text = self._canonicalise(f"{finding.title} {finding.description or ''}")
+        target = self._canonicalise(subject_name)
+        if not target or not text:
+            return 0.0
+        # token_set_ratio scores 100 when every name token appears in the text
+        # and stays low otherwise; partial_ratio is too noisy for short names.
+        return float(fuzz.token_set_ratio(target, text))
+
     # -- overall ----------------------------------------------------------------
 
     def confidence(self, subject: SearchSubject, finding: Finding) -> float:
@@ -116,9 +136,13 @@ class IdentityMatcher:
         signals: list[tuple[float, float]] = []  # (weight, score)
         dob_mismatch = False
 
-        candidate_name = finding.subject_name or finding.title
-        signals.append((weights.get("name", 0.55), self.name_score(subject.full_name,
-                                                                   candidate_name)))
+        # Name evidence tier: a name attributed by the source is a real signal;
+        # a bare mention in unstructured text is much weaker.
+        if finding.subject_name:
+            name_evidence = self.name_score(subject.full_name, finding.subject_name)
+        else:
+            name_evidence = self.mention_score(subject.full_name, finding)
+        signals.append((weights.get("name", 0.55), name_evidence))
 
         if subject.date_of_birth and finding.date_of_birth:
             score, dob_mismatch = self.dob_score(subject.date_of_birth, finding.date_of_birth)
@@ -139,6 +163,13 @@ class IdentityMatcher:
             return 0.0
         confidence = sum(w * s for w, s in signals) / total_weight
 
+        # Uncorroborated matches are capped: a name alone (however similar)
+        # never proves identity, and a mere text mention proves even less.
+        corroborated = len(signals) > 1
+        if not corroborated:
+            confidence = min(confidence, self.config.name_only_cap)
+        if not finding.subject_name:
+            confidence = min(confidence, self.config.mention_cap)
         if dob_mismatch:
             confidence = min(confidence, self.config.dob_mismatch_cap)
         return round(confidence, 1)

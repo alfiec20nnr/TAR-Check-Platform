@@ -16,6 +16,16 @@ scores:
 # birth dates almost certainly means two different people.
 dob_mismatch_cap: 30
 
+# Confidence ceilings that keep the accuracy rating honest. A name similarity
+# alone never proves identity — especially for common names — so confidence
+# can only approach 100 when independent signals (DOB, country) corroborate.
+caps:
+  # Record carries a structured subject name but no corroborating DOB/country:
+  name_only: 72
+  # Record has no structured subject name at all (a web page or news article
+  # that merely mentions the name somewhere in its text):
+  unstructured_mention: 55
+
 # Nickname/variant equivalences applied before fuzzy name comparison.
 name_variants:
   william: [bill, will, billy, liam]

@@ -146,6 +146,7 @@ async def _execute(session: AsyncSession, search: Search, settings: Settings) ->
     reference = report_generator.make_reference()
     report_json = report_generator.build_report_content(
         reference=reference,
+        mock_mode=settings.mock_connectors,
         subject={
             "full_name": search.full_name,
             "date_of_birth": search.date_of_birth,

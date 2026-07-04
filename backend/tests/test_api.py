@@ -26,7 +26,11 @@ async def submit_and_wait(client, payload: dict, timeout: float = 15.0) -> dict:
 async def test_health(client):
     resp = await client.get("/health")
     assert resp.status_code == 200
-    assert resp.json()["status"] == "ok"
+    body = resp.json()
+    assert body["status"] == "ok"
+    # The test env runs with MOCK_CONNECTORS=true; the flag must be surfaced
+    # so the UI can display the demo-mode banner.
+    assert body["mock_connectors"] is True
 
 
 async def test_submit_search_returns_id_immediately(client):

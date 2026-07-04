@@ -15,6 +15,7 @@ import {
   TableRow,
   TableSortLabel,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { useMemo, useState } from "react";
@@ -32,6 +33,34 @@ const CATEGORY_LABELS: Record<string, string> = {
   directorship: "Directorship",
   web: "Web",
 };
+
+// Mirrors the bands in the generated report: a name similarity alone is never
+// presented as a confirmed identity match.
+function matchBand(confidence: number): {
+  label: string;
+  color: "success" | "info" | "warning" | "default";
+  hint: string;
+} {
+  if (confidence >= 85)
+    return {
+      label: "Strong",
+      color: "success",
+      hint: "Corroborated by independent signals (e.g. date of birth)",
+    };
+  if (confidence >= 65)
+    return { label: "Probable", color: "info", hint: "Good match, limited corroboration" };
+  if (confidence >= 40)
+    return {
+      label: "Possible",
+      color: "warning",
+      hint: "Name-only or text-mention match — may be a different person",
+    };
+  return {
+    label: "Weak",
+    color: "default",
+    hint: "Below the risk-scoring threshold — excluded from the risk score",
+  };
+}
 
 export default function ResultsTable({ results }: { results: SearchResultOut[] }) {
   const [filterText, setFilterText] = useState("");
@@ -146,7 +175,26 @@ export default function ResultsTable({ results }: { results: SearchResultOut[] }
                   <Chip size="small" label={CATEGORY_LABELS[r.category] ?? r.category} />
                 </TableCell>
                 <TableCell>{r.event_date ?? "—"}</TableCell>
-                <TableCell align="right">{r.confidence}%</TableCell>
+                <TableCell align="right">
+                  <Box
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 0.75,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {r.confidence}%
+                    <Tooltip title={matchBand(r.confidence).hint}>
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        color={matchBand(r.confidence).color}
+                        label={matchBand(r.confidence).label}
+                      />
+                    </Tooltip>
+                  </Box>
+                </TableCell>
                 <TableCell align="right">{r.risk_contribution}</TableCell>
                 <TableCell align="center">
                   {r.url ? (

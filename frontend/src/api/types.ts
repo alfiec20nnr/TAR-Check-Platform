@@ -59,6 +59,12 @@ export interface SourceOut {
   enabled: boolean;
 }
 
+export interface HealthInfo {
+  status: string;
+  version: string;
+  mock_connectors: boolean;
+}
+
 export interface DashboardStats {
   total_searches: number;
   running_searches: number;

@@ -74,6 +74,46 @@ async def test_google_connector_normalises_results():
 
 
 @respx.mock
+async def test_google_connector_drops_results_that_never_mention_the_name():
+    respx.get("https://www.googleapis.com/customsearch/v1").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "items": [
+                    {
+                        "title": "Test Person — profile",
+                        "snippet": "About Test Person",
+                        "link": "https://example.com/p",
+                    },
+                    {
+                        "title": "Completely unrelated page",
+                        "snippet": "Nothing to do with the subject at all.",
+                        "link": "https://example.com/noise",
+                    },
+                ]
+            },
+        )
+    )
+    connector = GoogleSearchConnector(real_settings(google_api_key="k", google_cse_id="c"))
+    result = await connector.run(SUBJECT)
+    assert len(result.findings) == 1
+    # Web results are mentions, never source-attributed identities.
+    assert result.findings[0].subject_name is None
+
+
+async def test_mock_profiles_are_mostly_clean():
+    """~70% of names must land in the clean profile — adverse findings are the
+    exception in fixture data, mirroring reality."""
+    from app.connectors.mock_data import CLEAN, profile_for
+
+    names = [f"Person Number {i}" for i in range(200)]
+    clean = sum(
+        profile_for(SearchSubject(full_name=n)) == CLEAN for n in names
+    )
+    assert clean / len(names) > 0.6
+
+
+@respx.mock
 async def test_retry_on_transient_error_then_success():
     route = respx.get("https://www.googleapis.com/customsearch/v1")
     route.side_effect = [

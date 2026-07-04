@@ -64,4 +64,10 @@ app.include_router(dashboard.router, prefix="/api/v1")
 
 @app.get("/health", tags=["health"])
 async def health() -> dict:
-    return {"status": "ok", "version": __version__}
+    # mock_connectors is surfaced so the UI can show a prominent demo-mode
+    # banner — simulated fixture data must never be mistaken for real records.
+    return {
+        "status": "ok",
+        "version": __version__,
+        "mock_connectors": settings.mock_connectors,
+    }

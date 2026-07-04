@@ -34,3 +34,10 @@ export const api = {
 
 export const reportUrl = (searchId: string, format: "json" | "html" | "pdf") =>
   `${BASE}/searches/${searchId}/report?format=${format}`;
+
+// /health lives outside the /api/v1 prefix.
+export async function fetchHealth<T>(): Promise<T> {
+  const resp = await fetch("/health");
+  if (!resp.ok) throw new ApiError(resp.status, resp.statusText);
+  return resp.json() as Promise<T>;
+}

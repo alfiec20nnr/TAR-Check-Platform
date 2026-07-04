@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api } from "./client";
+import { api, fetchHealth } from "./client";
 import type {
   DashboardStats,
+  HealthInfo,
   PaginatedSearches,
   SearchCreate,
   SearchDetail,
@@ -49,6 +50,14 @@ export function useSubmitSearch() {
       queryClient.invalidateQueries({ queryKey: ["searches"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
+  });
+}
+
+export function useHealth() {
+  return useQuery({
+    queryKey: ["health"],
+    queryFn: () => fetchHealth<HealthInfo>(),
+    staleTime: Infinity,
   });
 }
 

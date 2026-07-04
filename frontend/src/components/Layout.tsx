@@ -5,6 +5,7 @@ import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import ShieldIcon from "@mui/icons-material/Shield";
 import SpaceDashboardIcon from "@mui/icons-material/SpaceDashboard";
 import {
+  Alert,
   AppBar,
   Box,
   Button,
@@ -16,6 +17,7 @@ import {
 } from "@mui/material";
 import { Link as RouterLink, Outlet, useLocation } from "react-router-dom";
 
+import { useHealth } from "../api/hooks";
 import { useColorMode } from "../theme";
 
 const NAV = [
@@ -27,6 +29,7 @@ const NAV = [
 export default function Layout() {
   const { mode, toggle } = useColorMode();
   const location = useLocation();
+  const { data: health } = useHealth();
 
   return (
     <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -59,6 +62,14 @@ export default function Layout() {
           </Tooltip>
         </Toolbar>
       </AppBar>
+      {health?.mock_connectors && (
+        <Alert severity="warning" sx={{ borderRadius: 0 }}>
+          <strong>Demo mode</strong> — connectors are returning simulated sample data, not real
+          records. Nothing shown relates to any real person. Set{" "}
+          <code>MOCK_CONNECTORS=false</code> and add API keys in <code>.env</code> to search real
+          sources.
+        </Alert>
+      )}
       <Container maxWidth="lg" sx={{ py: 3, flexGrow: 1 }}>
         <Outlet />
       </Container>

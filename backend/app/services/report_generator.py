@@ -40,11 +40,13 @@ def build_report_content(
     sources_searched: list[str],
     connector_stats: list[dict],
     duration_ms: int,
+    mock_mode: bool = False,
 ) -> dict:
     """The canonical JSON report body (also feeds the HTML template)."""
     return {
         "reference": reference,
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "mock_mode": mock_mode,
         "subject": subject,
         "risk": risk,
         "ai": ai,

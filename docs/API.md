@@ -119,5 +119,8 @@ searched, duration, results found, report reference), `search_failed`.
 ## Health
 
 ```
-GET /health   →  {"status": "ok", "version": "0.1.0"}
+GET /health   →  {"status": "ok", "version": "0.1.0", "mock_connectors": true}
 ```
+
+`mock_connectors` is `true` while the platform runs in demo mode (simulated
+fixture data); the UI uses it to display a demo-mode banner.

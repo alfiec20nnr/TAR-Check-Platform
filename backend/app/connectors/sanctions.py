@@ -16,7 +16,9 @@ from app.connectors import mock_data
 from app.connectors.base import BaseConnector, Category, Finding, SearchSubject
 
 _CACHE_TTL_SECONDS = 3600
-_MATCH_THRESHOLD = 85
+# token_sort_ratio ≥ 90 — 85 was loose enough to pull in near-miss surnames,
+# which produced sanctions "hits" for unrelated people with similar names.
+_MATCH_THRESHOLD = 90
 
 
 class UkSanctionsConnector(BaseConnector):
