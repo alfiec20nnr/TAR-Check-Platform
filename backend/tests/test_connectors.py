@@ -75,6 +75,38 @@ async def test_google_connector_normalises_results():
 
 
 @respx.mock
+async def test_google_adverse_results_categorised_as_adverse_media():
+    """Results containing adverse terms become adverse_media (so the risk
+    scorer's keyword escalation applies); neutral pages stay low-weight web."""
+    respx.get("https://www.googleapis.com/customsearch/v1").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "items": [
+                    {
+                        "title": "Test Person faces fraud investigation",
+                        "snippet": "Regulators are investigating Test Person.",
+                        "link": "https://news.example.com/fraud",
+                    },
+                    {
+                        "title": "Test Person speaks at conference",
+                        "snippet": "Test Person appeared as a panellist.",
+                        "link": "https://example.com/conf",
+                    },
+                ]
+            },
+        )
+    )
+    connector = GoogleSearchConnector(real_settings(google_api_key="k", google_cse_id="c"))
+    result = await connector.run(SUBJECT)
+    by_url = {f.url: f.category for f in result.findings}
+    assert by_url["https://news.example.com/fraud"] == Category.ADVERSE_MEDIA
+    assert by_url["https://example.com/conf"] == Category.WEB
+    # The same items arrive from both queries but are deduplicated by link.
+    assert len(result.findings) == 2
+
+
+@respx.mock
 async def test_google_connector_drops_results_that_never_mention_the_name():
     respx.get("https://www.googleapis.com/customsearch/v1").mock(
         return_value=httpx.Response(
@@ -119,12 +151,14 @@ async def test_retry_on_transient_error_then_success():
     route = respx.get("https://www.googleapis.com/customsearch/v1")
     route.side_effect = [
         httpx.Response(503),
+        # After the retry, the connector issues both its queries.
+        httpx.Response(200, json={"items": []}),
         httpx.Response(200, json={"items": []}),
     ]
     connector = GoogleSearchConnector(real_settings(google_api_key="k", google_cse_id="c"))
     result = await connector.run(SUBJECT)
     assert result.status == ConnectorStatus.SUCCESS
-    assert route.call_count == 2
+    assert route.call_count == 3
 
 
 @respx.mock
