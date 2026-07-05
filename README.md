@@ -45,7 +45,8 @@ Set `MOCK_CONNECTORS=false` and provide keys in `.env`:
 
 | Connector | Credentials | Where to get them |
 |---|---|---|
-| Google Search | `GOOGLE_API_KEY`, `GOOGLE_CSE_ID` | Google Programmable Search Engine |
+| Brave Web Search | `BRAVE_API_KEY` | [api-dashboard.search.brave.com](https://api-dashboard.search.brave.com/register) — recommended web source, free tier |
+| Google Search | `GOOGLE_API_KEY`, `GOOGLE_CSE_ID` | ⚠ Closed to new customers since Jan 2026 — grandfathered keys only |
 | News API | `NEWSAPI_KEY` | newsapi.org |
 | UK Companies House | `COMPANIES_HOUSE_API_KEY` | developer.company-information.service.gov.uk |
 | FCA register | `FCA_API_EMAIL`, `FCA_API_KEY` | register.fca.org.uk/Developer |

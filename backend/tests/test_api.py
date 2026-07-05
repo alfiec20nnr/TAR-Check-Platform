@@ -140,6 +140,7 @@ async def test_sources_registry(client):
     sources = (await client.get("/api/v1/sources")).json()
     names = {s["name"] for s in sources}
     assert names == {
+        "brave_search",
         "google_search",
         "news_api",
         "companies_house",

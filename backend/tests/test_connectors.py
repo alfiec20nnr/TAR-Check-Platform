@@ -75,6 +75,48 @@ async def test_google_connector_normalises_results():
 
 
 @respx.mock
+async def test_brave_connector_normalises_and_categorises():
+    from app.connectors.brave_search import BraveSearchConnector
+
+    respx.get("https://api.search.brave.com/res/v1/web/search").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "web": {
+                    "results": [
+                        {
+                            "title": "Test Person faces fraud investigation",
+                            "description": "Regulators are investigating Test Person.",
+                            "url": "https://news.example.com/fraud",
+                            "page_age": "2024-05-01T00:00:00",
+                        },
+                        {
+                            "title": "Test Person — company profile",
+                            "description": "About Test Person.",
+                            "url": "https://example.com/profile",
+                        },
+                        {
+                            "title": "Unrelated page",
+                            "description": "No mention of the subject.",
+                            "url": "https://example.com/noise",
+                        },
+                    ]
+                }
+            },
+        )
+    )
+    connector = BraveSearchConnector(real_settings(brave_api_key="k"))
+    result = await connector.run(SUBJECT)
+    assert result.status == ConnectorStatus.SUCCESS
+    by_url = {f.url: f for f in result.findings}
+    assert set(by_url) == {"https://news.example.com/fraud", "https://example.com/profile"}
+    assert by_url["https://news.example.com/fraud"].category == Category.ADVERSE_MEDIA
+    assert by_url["https://news.example.com/fraud"].date == "2024-05-01"
+    assert by_url["https://example.com/profile"].category == Category.WEB
+    assert all(f.subject_name is None for f in result.findings)
+
+
+@respx.mock
 async def test_google_adverse_results_categorised_as_adverse_media():
     """Results containing adverse terms become adverse_media (so the risk
     scorer's keyword escalation applies); neutral pages stay low-weight web."""

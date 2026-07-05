@@ -9,6 +9,7 @@ import asyncio
 
 from app.config import Settings, get_settings
 from app.connectors.base import BaseConnector, ConnectorResult, SearchSubject
+from app.connectors.brave_search import BraveSearchConnector
 from app.connectors.companies_house import CompaniesHouseConnector
 from app.connectors.fca_warning import FcaWarningConnector
 from app.connectors.google_search import GoogleSearchConnector
@@ -17,6 +18,7 @@ from app.connectors.news_api import NewsApiConnector
 from app.connectors.sanctions import UkSanctionsConnector
 
 CONNECTOR_CLASSES: list[type[BaseConnector]] = [
+    BraveSearchConnector,
     GoogleSearchConnector,
     NewsApiConnector,
     CompaniesHouseConnector,

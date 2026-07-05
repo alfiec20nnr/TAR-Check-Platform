@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     google_api_key: str = ""
     google_cse_id: str = ""
     newsapi_key: str = ""
+    brave_api_key: str = ""
     companies_house_api_key: str = ""
     fca_api_email: str = ""
     fca_api_key: str = ""

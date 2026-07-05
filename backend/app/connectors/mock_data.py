@@ -33,14 +33,14 @@ def _country(subject: SearchSubject) -> str:
     return subject.country or "United Kingdom"
 
 
-def google_mock(subject: SearchSubject) -> list[Finding]:
-    # Like the real connector, web results are unstructured mentions: no
+def web_mock(subject: SearchSubject, source: str = "google_search") -> list[Finding]:
+    # Like the real connectors, web results are unstructured mentions: no
     # subject_name is attributed, so identity matching applies its low
     # mention-confidence ceiling.
     name = subject.full_name
     findings = [
         Finding(
-            source="google_search",
+            source=source,
             category=Category.WEB,
             title=f"{name} — LinkedIn profile",
             description=f"Professional profile page for {name}.",
@@ -48,7 +48,7 @@ def google_mock(subject: SearchSubject) -> list[Finding]:
             raw={"mock": True},
         ),
         Finding(
-            source="google_search",
+            source=source,
             category=Category.WEB,
             title=f"{name} speaks at industry conference",
             description=f"{name} appeared as a panellist at a trade conference.",
@@ -60,7 +60,7 @@ def google_mock(subject: SearchSubject) -> list[Finding]:
     if profile_for(subject) >= INSOLVENCY:
         findings.append(
             Finding(
-                source="google_search",
+                source=source,
                 category=Category.WEB,
                 title=f"Court listing mentions {name}",
                 description=f"A county court listing includes the name {name}.",
