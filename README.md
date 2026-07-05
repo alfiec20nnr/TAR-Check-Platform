@@ -49,7 +49,7 @@ Set `MOCK_CONNECTORS=false` and provide keys in `.env`:
 | News API | `NEWSAPI_KEY` | newsapi.org |
 | UK Companies House | `COMPANIES_HOUSE_API_KEY` | developer.company-information.service.gov.uk |
 | FCA register | `FCA_API_EMAIL`, `FCA_API_KEY` | register.fca.org.uk/Developer |
-| UK Sanctions List | none (public download) | URL configurable via `UK_SANCTIONS_LIST_URL` |
+| UK Sanctions List | **none — works out of the box** | Live FCDO XML feed (default URL); a licensed provider JSON endpoint also works |
 | Insolvency Register | `INSOLVENCY_API_URL`, `INSOLVENCY_API_KEY` | licensed data provider of your choice |
 
 Connectors without credentials are skipped gracefully; the rest still run.

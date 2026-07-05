@@ -49,8 +49,9 @@ class Settings(BaseSettings):
     companies_house_api_key: str = ""
     fca_api_email: str = ""
     fca_api_key: str = ""
+    # Live FCDO XML feed — the authoritative UK list (OFSI JSON retired 01/2026).
     uk_sanctions_list_url: str = (
-        "https://assets.publishing.service.gov.uk/media/uk-sanctions-list.json"
+        "https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.xml"
     )
     insolvency_api_url: str = ""
     insolvency_api_key: str = ""

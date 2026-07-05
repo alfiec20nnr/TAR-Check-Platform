@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
+from app.connectors.registry import get_registry
 from app.database import get_db
 from app.models import AuditLog, Search, SearchStatus, Source
 from app.schemas import AuditEntryOut, DashboardStats, SearchOut, SourceOut
@@ -50,8 +52,25 @@ async def dashboard_stats(db: AsyncSession = Depends(get_db)) -> DashboardStats:
 
 
 @router.get("/sources", response_model=list[SourceOut])
-async def list_sources(db: AsyncSession = Depends(get_db)) -> list[Source]:
-    return (await db.execute(select(Source).order_by(Source.name))).scalars().all()
+async def list_sources(db: AsyncSession = Depends(get_db)) -> list[SourceOut]:
+    settings = get_settings()
+    # In live mode, report whether each connector has the credentials it needs
+    # so the UI can explain why a source was skipped.
+    configured = {
+        c.name: settings.mock_connectors or c.is_configured()
+        for c in get_registry(settings).connectors
+    }
+    rows = (await db.execute(select(Source).order_by(Source.name))).scalars().all()
+    return [
+        SourceOut(
+            name=r.name,
+            display_name=r.display_name,
+            description=r.description,
+            enabled=r.enabled,
+            configured=configured.get(r.name, True),
+        )
+        for r in rows
+    ]
 
 
 @router.get("/audit", response_model=list[AuditEntryOut])

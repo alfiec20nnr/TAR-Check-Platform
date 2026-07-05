@@ -90,6 +90,9 @@ class SourceOut(BaseModel):
     display_name: str
     description: str | None = None
     enabled: bool
+    # Whether the connector has the credentials it needs to run live. In mock
+    # mode every source reports True (fixtures need no keys).
+    configured: bool = True
 
 
 class AuditEntryOut(BaseModel):

@@ -138,10 +138,62 @@ async def test_non_retryable_error_fails_immediately():
     assert result.error
 
 
+_SANCTIONS_XML = """<?xml version="1.0" encoding="utf-8"?>
+<Designations>
+  <Designation>
+    <DateDesignated>29/06/2012</DateDesignated>
+    <UniqueID>TST0001</UniqueID>
+    <Names>
+      <Name><Name1>Test</Name1><Name6>Person</Name6><NameType>Primary Name</NameType></Name>
+      <Name><Name6>Tester Person</Name6><NameType>Alias</NameType></Name>
+    </Names>
+    <RegimeName>The Test (Sanctions) Regulations</RegimeName>
+    <IndividualEntityShip>Individual</IndividualEntityShip>
+    <DOBs><DOB>02/03/1975</DOB></DOBs>
+    <Addresses><Address><AddressCountry>United Kingdom</AddressCountry></Address></Addresses>
+  </Designation>
+  <Designation>
+    <Names><Name><Name6>Unrelated Company Ltd</Name6></Name></Names>
+    <IndividualEntityShip>Entity</IndividualEntityShip>
+  </Designation>
+  <Designation>
+    <Names><Name><Name6>Somebody Else Entirely</Name6></Name></Names>
+    <IndividualEntityShip>Individual</IndividualEntityShip>
+  </Designation>
+</Designations>
+"""
+
+
 @respx.mock
-async def test_sanctions_connector_fuzzy_matches_individuals():
+async def test_sanctions_connector_parses_fcdo_xml():
+    """The live FCDO feed is XML: individuals only, aliases matched, dates and
+    DOBs converted from DD/MM/YYYY, addresses surfaced as location."""
+    UkSanctionsConnector._cache = None
+    url = "https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.xml"
+    respx.get(url).mock(
+        return_value=httpx.Response(200, content=_SANCTIONS_XML, headers={
+            "Content-Type": "text/xml",
+        })
+    )
+    connector = UkSanctionsConnector(real_settings(uk_sanctions_list_url=url))
+    result = await connector.run(SUBJECT)
+    assert result.status == ConnectorStatus.SUCCESS
+    assert len(result.findings) == 1
+    finding = result.findings[0]
+    assert finding.category == Category.SANCTIONS
+    assert finding.subject_name == "Test Person"
+    assert finding.date_of_birth == "1975-03-02"
+    assert finding.location == "United Kingdom"
+    assert finding.date == "2012-06-29"
+    assert "The Test (Sanctions) Regulations" in (finding.description or "")
+    UkSanctionsConnector._cache = None
+
+
+@respx.mock
+async def test_sanctions_connector_accepts_licensed_provider_json():
     UkSanctionsConnector._cache = None  # reset the class-level list cache
-    respx.get("https://assets.publishing.service.gov.uk/media/uk-sanctions-list.json").mock(
+    json_url = "https://provider.example.com/sanctions.json"
+    respx.get(json_url).mock(
         return_value=httpx.Response(
             200,
             json={
@@ -163,7 +215,7 @@ async def test_sanctions_connector_fuzzy_matches_individuals():
             },
         )
     )
-    connector = UkSanctionsConnector(real_settings())
+    connector = UkSanctionsConnector(real_settings(uk_sanctions_list_url=json_url))
     result = await connector.run(SUBJECT)
     assert result.status == ConnectorStatus.SUCCESS
     assert len(result.findings) == 1

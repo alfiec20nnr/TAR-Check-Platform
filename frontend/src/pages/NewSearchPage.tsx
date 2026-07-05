@@ -41,8 +41,8 @@ export default function NewSearchPage() {
                 <Stack key={s.name} direction="row" spacing={1} alignItems="baseline">
                   <Chip
                     size="small"
-                    label={s.enabled ? "on" : "off"}
-                    color={s.enabled ? "success" : "default"}
+                    label={!s.enabled ? "off" : s.configured ? "on" : "needs API key"}
+                    color={!s.enabled ? "default" : s.configured ? "success" : "warning"}
                     variant="outlined"
                   />
                   <div>
@@ -51,6 +51,8 @@ export default function NewSearchPage() {
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       {s.description}
+                      {s.enabled && !s.configured &&
+                        " — skipped until credentials are added to .env"}
                     </Typography>
                   </div>
                 </Stack>

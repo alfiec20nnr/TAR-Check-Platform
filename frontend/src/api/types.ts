@@ -57,6 +57,8 @@ export interface SourceOut {
   display_name: string;
   description: string | null;
   enabled: boolean;
+  /** False when the connector lacks credentials and will be skipped in live mode. */
+  configured: boolean;
 }
 
 export interface HealthInfo {
