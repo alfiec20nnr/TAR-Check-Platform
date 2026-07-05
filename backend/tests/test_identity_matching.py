@@ -65,6 +65,21 @@ def test_token_order_irrelevant():
     assert m.name_score("Smith John", "John Smith") == 100
 
 
+def test_conflicting_forename_is_capped():
+    """Shared surname + different forename is almost certainly someone else."""
+    m = matcher()
+    subject = SearchSubject(full_name="Philip Green")
+    f = make_finding(subject_name="Terry Green")
+    assert m.confidence(subject, f) <= m.config.name_conflict_cap
+    assert m.confidence(subject, f) < 40  # excluded from risk scoring
+
+
+def test_missing_middle_name_is_not_a_conflict():
+    m = matcher()
+    assert m.name_score("Philip Nigel Green", "Philip Green") > 70
+    assert m.name_score("Roman Abramovich", "Roman Arkadyevich Abramovich") > 80
+
+
 def test_dob_exact_match_boosts_confidence():
     m = matcher()
     subject = SearchSubject(full_name="Jane Doe", date_of_birth="1980-04-12")

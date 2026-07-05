@@ -15,15 +15,34 @@ class in :mod:`app.connectors.registry` — no core code changes required.
 import asyncio
 import enum
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
+from rapidfuzz import fuzz
 
 from app.config import Settings
 
 logger = logging.getLogger(__name__)
+
+
+def screening_score(subject_name: str, candidate_name: str) -> float:
+    """Name-similarity score used by connectors to screen candidate records.
+
+    token_set_ratio tolerates extra name parts (middle names, patronymics) so a
+    true hit cannot hide behind them — but only when BOTH names carry at least
+    two tokens. A single-token name (e.g. the sanctions codename alias "Green")
+    would otherwise trivially match any subject sharing that one word.
+    """
+    normalise = lambda s: " ".join(re.sub(r"[^\w\s'-]", " ", s.lower()).split())  # noqa: E731
+    a, b = normalise(subject_name), normalise(candidate_name)
+    if not a or not b:
+        return 0.0
+    if len(a.split()) >= 2 and len(b.split()) >= 2:
+        return float(fuzz.token_set_ratio(a, b))
+    return float(fuzz.token_sort_ratio(a, b))
 
 
 # Normalised finding categories, referenced by the risk-scoring config.

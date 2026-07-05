@@ -26,6 +26,7 @@ class MatchingConfig:
     dob_mismatch_cap: float
     name_only_cap: float
     mention_cap: float
+    name_conflict_cap: float
     name_variants: dict[str, list[str]]
 
     @classmethod
@@ -38,6 +39,7 @@ class MatchingConfig:
             dob_mismatch_cap=float(data.get("dob_mismatch_cap", 30)),
             name_only_cap=float(caps.get("name_only", 72)),
             mention_cap=float(caps.get("unstructured_mention", 55)),
+            name_conflict_cap=float(caps.get("name_conflict", 35)),
             name_variants=data.get("name_variants", {}),
         )
 
@@ -72,16 +74,45 @@ class IdentityMatcher:
         tokens = _normalise(name).split()
         return " ".join(self._canonical.get(t, t) for t in tokens)
 
+    @staticmethod
+    def _token_covered(token: str, others: list[str]) -> bool:
+        """Whether a name token has a plausible counterpart in the other name
+        (equal, close spelling variant, or initial)."""
+        for other in others:
+            if token == other:
+                return True
+            if len(token) == 1 and other.startswith(token):
+                return True
+            if len(other) == 1 and token.startswith(other):
+                return True
+            if fuzz.ratio(token, other) >= 75:
+                return True
+        return False
+
     def name_score(self, subject_name: str, candidate_name: str) -> float:
         a = self._canonicalise(subject_name)
         b = self._canonicalise(candidate_name)
         if not a or not b:
             return 0.0
-        exact = fuzz.token_sort_ratio(a, b)
-        # token_set_ratio tolerates extra tokens (middle names, titles) but is
-        # more permissive, so blend rather than take it outright.
-        loose = fuzz.token_set_ratio(a, b)
-        return max(exact, 0.5 * exact + 0.5 * loose)
+        a_tokens, b_tokens = a.split(), b.split()
+        score = float(fuzz.token_sort_ratio(a, b))
+        if len(a_tokens) >= 2 and len(b_tokens) >= 2:
+            # token_set_ratio tolerates extra tokens (middle names, titles) but
+            # is more permissive, so blend rather than take it outright — and
+            # never use it against single-token names, which it would match
+            # trivially.
+            loose = fuzz.token_set_ratio(a, b)
+            score = max(score, 0.5 * score + 0.5 * loose)
+        # A true conflict is when BOTH names carry a part the other lacks
+        # ("Philip Green" vs "Terry Green") — almost certainly two different
+        # people, so cap below the risk-scoring threshold. One name merely
+        # omitting a middle name ("Philip Nigel Green" vs "Philip Green") is
+        # not a conflict.
+        subject_uncovered = any(not self._token_covered(t, b_tokens) for t in a_tokens)
+        candidate_uncovered = any(not self._token_covered(t, a_tokens) for t in b_tokens)
+        if subject_uncovered and candidate_uncovered:
+            score = min(score, self.config.name_conflict_cap)
+        return score
 
     @staticmethod
     def dob_score(subject_dob: str, candidate_dob: str) -> tuple[float, bool]:

@@ -7,9 +7,21 @@ director disqualifications — never for company-centric search.
 import httpx
 
 from app.connectors import mock_data
-from app.connectors.base import BaseConnector, Category, Finding, SearchSubject
+from app.connectors.base import (
+    BaseConnector,
+    Category,
+    Finding,
+    SearchSubject,
+    screening_score,
+)
 
 BASE_URL = "https://api.company-information.service.gov.uk"
+
+# Companies House search is deliberately fuzzy (a query for "Philip Green"
+# returns every Green on the register). Only records whose name actually
+# matches the subject are surfaced; the rest are different people, not
+# evidence.
+_NAME_SCREEN_THRESHOLD = 85
 
 
 class CompaniesHouseConnector(BaseConnector):
@@ -44,6 +56,9 @@ class CompaniesHouseConnector(BaseConnector):
         resp.raise_for_status()
         findings = []
         for item in resp.json().get("items", []):
+            title = item.get("title") or ""
+            if screening_score(subject.full_name, title) < _NAME_SCREEN_THRESHOLD:
+                continue
             dob = item.get("date_of_birth") or {}
             dob_str = None
             if dob.get("year"):
@@ -78,6 +93,9 @@ class CompaniesHouseConnector(BaseConnector):
         resp.raise_for_status()
         findings = []
         for item in resp.json().get("items", []):
+            title = item.get("title") or ""
+            if screening_score(subject.full_name, title) < _NAME_SCREEN_THRESHOLD:
+                continue
             dob_str = item.get("date_of_birth")
             findings.append(
                 Finding(

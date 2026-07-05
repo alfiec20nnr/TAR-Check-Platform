@@ -25,6 +25,11 @@ caps:
   # Record has no structured subject name at all (a web page or news article
   # that merely mentions the name somewhere in its text):
   unstructured_mention: 55
+  # Some subject name part has no counterpart in the record's name (e.g.
+  # "Philip Green" vs "Terry Green" — shared surname, conflicting forename).
+  # Kept below the risk-scoring threshold: this is almost certainly a
+  # different person.
+  name_conflict: 35
 
 # Nickname/variant equivalences applied before fuzzy name comparison.
 name_variants:

@@ -5,7 +5,8 @@ import pytest
 import respx
 
 from app.config import Settings
-from app.connectors.base import Category, ConnectorStatus, SearchSubject
+from app.connectors.base import Category, ConnectorStatus, SearchSubject, screening_score
+from app.connectors.companies_house import CompaniesHouseConnector
 from app.connectors.google_search import GoogleSearchConnector
 from app.connectors.registry import CONNECTOR_CLASSES, get_registry
 from app.connectors.sanctions import UkSanctionsConnector
@@ -221,6 +222,40 @@ async def test_sanctions_connector_accepts_licensed_provider_json():
     assert len(result.findings) == 1
     assert result.findings[0].category == Category.SANCTIONS
     UkSanctionsConnector._cache = None
+
+
+def test_screening_score_rules():
+    # Extra name parts (patronymics/middle names) must not hide a true hit.
+    assert screening_score("Roman Abramovich", "Roman Arkadyevich Abramovich") >= 90
+    # Registry "SURNAME, Forename" formatting is handled.
+    assert screening_score("Philip Green", "GREEN, Philip") >= 90
+    # A single-token alias (sanctions codename "Green") must never subset-match.
+    assert screening_score("Philip Green", "Green") < 90
+    # A different person sharing a surname is not a match.
+    assert screening_score("Philip Green", "Terry Green") < 85
+
+
+@respx.mock
+async def test_companies_house_screens_out_other_names():
+    """CH search is fuzzy — records for differently-named people are dropped."""
+    respx.get("https://api.company-information.service.gov.uk/search/officers").mock(
+        return_value=httpx.Response(
+            200,
+            json={"items": [
+                {"title": "Philip GREEN", "address_snippet": "London",
+                 "links": {"self": "/officers/1"}},
+                {"title": "Terry GREEN", "address_snippet": "Leeds",
+                 "links": {"self": "/officers/2"}},
+            ]},
+        )
+    )
+    respx.get(
+        "https://api.company-information.service.gov.uk/search/disqualified-officers"
+    ).mock(return_value=httpx.Response(200, json={"items": []}))
+    connector = CompaniesHouseConnector(real_settings(companies_house_api_key="k"))
+    result = await connector.run(SearchSubject(full_name="Philip Green"))
+    assert result.status == ConnectorStatus.SUCCESS
+    assert [f.subject_name for f in result.findings] == ["Philip GREEN"]
 
 
 @pytest.mark.parametrize("cls", CONNECTOR_CLASSES)

@@ -17,10 +17,15 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
-from rapidfuzz import fuzz
 
 from app.connectors import mock_data
-from app.connectors.base import BaseConnector, Category, Finding, SearchSubject
+from app.connectors.base import (
+    BaseConnector,
+    Category,
+    Finding,
+    SearchSubject,
+    screening_score,
+)
 
 _CACHE_TTL_SECONDS = 3600
 # Screening threshold. token_set_ratio tolerates extra name parts (patronymics,
@@ -200,15 +205,11 @@ class UkSanctionsConnector(BaseConnector):
     async def fetch(self, subject: SearchSubject, client: httpx.AsyncClient) -> list[Finding]:
         designations = await self._load_list(client)
         findings = []
-        target = subject.full_name.lower()
-        # A single-token subject name would trivially be a "subset" of almost
-        # any designation, so fall back to the stricter sorted comparison.
-        scorer = fuzz.token_set_ratio if len(target.split()) >= 2 else fuzz.token_sort_ratio
         for entry in designations:
             best_score = 0.0
             best_name = None
             for candidate in entry.names:
-                score = scorer(target, candidate.lower())
+                score = screening_score(subject.full_name, candidate)
                 if score > best_score:
                     best_score, best_name = score, candidate
             if best_score < _MATCH_THRESHOLD or best_name is None:
