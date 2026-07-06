@@ -211,6 +211,46 @@ async def test_audit_trail_written(client):
         assert key in completed["details"]
 
 
+async def test_delete_single_search(client):
+    detail = await submit_and_wait(client, {"full_name": "Delete Me"})
+    keep = await submit_and_wait(client, {"full_name": "Keep Me"})
+
+    resp = await client.delete(f"/api/v1/searches/{detail['id']}")
+    assert resp.status_code == 204
+    assert (await client.get(f"/api/v1/searches/{detail['id']}")).status_code == 404
+    # The stored report is gone with it.
+    assert (
+        await client.get(f"/api/v1/searches/{detail['id']}/report")
+    ).status_code == 404
+    # Other searches are untouched.
+    assert (await client.get(f"/api/v1/searches/{keep['id']}")).status_code == 200
+
+    # Deleting is itself audited; the original submission entry survives.
+    entries = (await client.get(f"/api/v1/audit?search_id={detail['id']}")).json()
+    actions = [e["action"] for e in entries]
+    assert "search_deleted" in actions
+    assert "search_submitted" in actions
+
+    missing = await client.delete("/api/v1/searches/does-not-exist")
+    assert missing.status_code == 404
+
+
+async def test_clear_history(client):
+    await submit_and_wait(client, {"full_name": "Person One"})
+    await submit_and_wait(client, {"full_name": "Person Two"})
+
+    resp = await client.delete("/api/v1/searches")
+    assert resp.status_code == 200
+    assert resp.json()["deleted"] == 2
+    assert (await client.get("/api/v1/searches")).json()["total"] == 0
+
+    # The clearance is audited; prior audit entries are never deleted.
+    entries = (await client.get("/api/v1/audit")).json()
+    actions = [e["action"] for e in entries]
+    assert "history_cleared" in actions
+    assert actions.count("search_submitted") == 2
+
+
 async def test_personal_data_encrypted_at_rest(client, monkeypatch):
     """With a key configured, raw DB storage must not contain the plain name."""
     from cryptography.fernet import Fernet

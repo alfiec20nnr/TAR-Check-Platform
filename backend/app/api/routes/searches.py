@@ -1,19 +1,21 @@
-"""Search endpoints: submit, status, results, history."""
+"""Search endpoints: submit, status, results, history (incl. deletion)."""
 
 import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
 from app.database import get_db
-from app.models import Report, Search, SearchStatus
+from app.models import AISummary, Report, RiskScore, Search, SearchResult, SearchStatus
 from app.schemas import PaginatedSearches, SearchCreate, SearchDetail, SearchOut
 from app.services import audit
 from app.services.pipeline import run_search_pipeline
+
+_TERMINAL = (SearchStatus.COMPLETED.value, SearchStatus.FAILED.value)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/searches", tags=["searches"])
@@ -97,6 +99,55 @@ async def list_searches(
         page=page,
         page_size=page_size,
     )
+
+
+async def _delete_search_rows(db: AsyncSession, search_ids: list[str]) -> None:
+    """Remove searches and their dependent rows.
+
+    Children are deleted explicitly (rather than relying on DB-level ON DELETE
+    CASCADE) so behaviour is identical on PostgreSQL and SQLite. Audit-log
+    entries are never touched — the record *that a search happened* is
+    append-only and permanent.
+    """
+    if not search_ids:
+        return
+    for model in (SearchResult, Report, AISummary, RiskScore):
+        await db.execute(delete(model).where(model.search_id.in_(search_ids)))
+    await db.execute(delete(Search).where(Search.id.in_(search_ids)))
+
+
+@router.delete("", status_code=200)
+async def clear_history(db: AsyncSession = Depends(get_db)) -> dict:
+    """Clear the search history (completed/failed searches only).
+
+    In-flight searches are left untouched; audit entries are always retained,
+    and the clearance itself is audited.
+    """
+    ids = list(
+        (
+            await db.execute(select(Search.id).where(Search.status.in_(_TERMINAL)))
+        ).scalars()
+    )
+    await _delete_search_rows(db, ids)
+    await audit.record(db, "history_cleared", details={"deleted": len(ids)})
+    await db.commit()
+    return {"deleted": len(ids)}
+
+
+@router.delete("/{search_id}", status_code=204)
+async def delete_search(search_id: str, db: AsyncSession = Depends(get_db)) -> None:
+    """Delete a single search from the history (with its results and report)."""
+    search = await db.get(Search, search_id)
+    if search is None:
+        raise HTTPException(status_code=404, detail="Search not found")
+    if search.status not in _TERMINAL:
+        raise HTTPException(
+            status_code=409,
+            detail="Search is still running — wait for it to finish before deleting",
+        )
+    await _delete_search_rows(db, [search_id])
+    await audit.record(db, "search_deleted", search_id=search_id)
+    await db.commit()
 
 
 @router.get("/{search_id}", response_model=SearchDetail)

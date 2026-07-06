@@ -53,6 +53,33 @@ export function useSubmitSearch() {
   });
 }
 
+export function useDeleteSearches() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      // Sequential keeps the audit trail ordered and avoids rate-limit bursts.
+      for (const id of ids) {
+        await api.delete(`/searches/${id}`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["searches"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
+export function useClearHistory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.delete<{ deleted: number }>("/searches"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["searches"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
 export function useHealth() {
   return useQuery({
     queryKey: ["health"],
