@@ -54,6 +54,10 @@ class Category:
     ADVERSE_MEDIA = "adverse_media"
     DIRECTORSHIP = "directorship"
     WEB = "web"
+    DRIVING_LICENCE = "driving_licence"  # informational verification result
+    DRIVING_LICENCE_ISSUE = "driving_licence_issue"  # revoked/expired/not found
+    DRIVING_ENDORSEMENT = "driving_endorsement"
+    DRIVING_DISQUALIFICATION = "driving_disqualification"
 
 
 @dataclass
@@ -63,6 +67,9 @@ class SearchSubject:
     full_name: str
     date_of_birth: str | None = None  # ISO date string
     country: str | None = None
+    # Optional; enables the DVLA driving-licence check. Only accepted by the
+    # API together with a recorded driver-consent attestation.
+    driving_licence_number: str | None = None
 
 
 @dataclass
@@ -135,6 +142,15 @@ class BaseConnector:
         """Whether the connector has the credentials/config it needs."""
         return True
 
+    def applies_to(self, subject: SearchSubject) -> bool:
+        """Whether this connector is applicable to the given subject.
+
+        Most connectors apply to every search; identifier-driven checks (e.g.
+        the DVLA licence check) override this to skip subjects that did not
+        supply the identifier. Applies in mock mode too.
+        """
+        return True
+
     async def fetch(self, subject: SearchSubject, client: httpx.AsyncClient) -> list[Finding]:
         """Query the source and return normalised findings. Subclasses implement."""
         raise NotImplementedError
@@ -151,6 +167,14 @@ class BaseConnector:
 
         def _elapsed() -> int:
             return int((time.monotonic() - start) * 1000)
+
+        if not self.applies_to(subject):
+            return ConnectorResult(
+                connector=self.name,
+                status=ConnectorStatus.SKIPPED,
+                error="not applicable to this search",
+                duration_ms=_elapsed(),
+            )
 
         if self.settings.mock_connectors:
             findings = self.mock_findings(subject)

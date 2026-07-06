@@ -56,6 +56,13 @@ class Settings(BaseSettings):
     )
     insolvency_api_url: str = ""
     insolvency_api_key: str = ""
+    # DVLA Access to Driver Data (ADD) — requires a commercial agreement with
+    # DVLA; credentials are issued per consumer. Defaults to the UAT
+    # environment; set the production base URL when going live.
+    dvla_api_base_url: str = "https://uat.driver-vehicle-licensing.api.gov.uk"
+    dvla_username: str = ""
+    dvla_password: str = ""
+    dvla_api_key: str = ""
 
     # Config files (tunable without code changes)
     risk_config_path: Path = Field(default=BASE_DIR / "config" / "risk_weights.yaml")

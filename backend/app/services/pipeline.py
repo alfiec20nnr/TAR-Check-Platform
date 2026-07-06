@@ -66,6 +66,7 @@ async def _execute(session: AsyncSession, search: Search, settings: Settings) ->
         full_name=search.full_name,
         date_of_birth=search.date_of_birth,
         country=search.country,
+        driving_licence_number=search.driving_licence_number,
     )
 
     # 1. Run connectors concurrently.

@@ -29,9 +29,19 @@ async def test_mock_mode_all_connectors_succeed():
     registry = get_registry(Settings(mock_connectors=True))
     results = await registry.run_all(SUBJECT)
     assert len(results) == len(CONNECTOR_CLASSES)
-    assert all(r.status == ConnectorStatus.SUCCESS for r in results)
+    by_name = {r.connector: r for r in results}
+    # DVLA is identifier-driven: skipped (even in mock mode) without a
+    # licence number; every other connector succeeds.
+    assert by_name.pop("dvla_add").status == ConnectorStatus.SKIPPED
+    assert all(r.status == ConnectorStatus.SUCCESS for r in by_name.values())
     # Every connector reports its execution time.
     assert all(r.duration_ms >= 0 for r in results)
+
+    with_licence = SearchSubject(
+        full_name="Test Person", driving_licence_number="PERSO657054TE9IJ"
+    )
+    results = await registry.run_all(with_licence)
+    assert all(r.status == ConnectorStatus.SUCCESS for r in results)
 
 
 async def test_mock_findings_are_deterministic():

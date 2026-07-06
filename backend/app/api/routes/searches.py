@@ -33,6 +33,7 @@ async def submit_search(
         full_name=payload.full_name,
         date_of_birth=payload.date_of_birth.isoformat() if payload.date_of_birth else None,
         country=payload.country,
+        driving_licence_number=payload.driving_licence_number,
         status=SearchStatus.PENDING.value,
     )
     db.add(search)
@@ -41,7 +42,14 @@ async def submit_search(
         db,
         "search_submitted",
         search_id=search.id,
-        details={"country": payload.country, "dob_provided": payload.date_of_birth is not None},
+        details={
+            "country": payload.country,
+            "dob_provided": payload.date_of_birth is not None,
+            # The licence number itself is never audited — only the fact a
+            # consented DVLA check was requested.
+            "licence_check_requested": payload.driving_licence_number is not None,
+            "licence_check_consent": payload.licence_check_consent,
+        },
     )
     await db.commit()
     await db.refresh(search)

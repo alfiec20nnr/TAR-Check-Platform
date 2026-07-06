@@ -11,6 +11,7 @@ from app.config import Settings, get_settings
 from app.connectors.base import BaseConnector, ConnectorResult, SearchSubject
 from app.connectors.brave_search import BraveSearchConnector
 from app.connectors.companies_house import CompaniesHouseConnector
+from app.connectors.dvla_add import DvlaAddConnector
 from app.connectors.fca_warning import FcaWarningConnector
 from app.connectors.google_search import GoogleSearchConnector
 from app.connectors.insolvency import InsolvencyConnector
@@ -25,6 +26,7 @@ CONNECTOR_CLASSES: list[type[BaseConnector]] = [
     InsolvencyConnector,
     UkSanctionsConnector,
     FcaWarningConnector,
+    DvlaAddConnector,
 ]
 
 

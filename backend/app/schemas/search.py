@@ -1,8 +1,11 @@
 """Pydantic schemas for the public REST API."""
 
+import re
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+_LICENCE_NUMBER_RE = re.compile(r"^[A-Z0-9]{8,18}$")
 
 
 class SearchCreate(BaseModel):
@@ -11,6 +14,21 @@ class SearchCreate(BaseModel):
     full_name: str = Field(min_length=2, max_length=200, description="Full name (required)")
     date_of_birth: date | None = Field(default=None, description="Date of birth (optional)")
     country: str | None = Field(default=None, max_length=64, description="Country (optional)")
+    driving_licence_number: str | None = Field(
+        default=None,
+        max_length=24,
+        description=(
+            "Driving licence number (optional) — enables the DVLA licence check. "
+            "Requires licence_check_consent."
+        ),
+    )
+    licence_check_consent: bool = Field(
+        default=False,
+        description=(
+            "Attestation that the driver has consented to a DVLA licence data "
+            "check. Mandatory when a licence number is supplied."
+        ),
+    )
 
     @field_validator("full_name")
     @classmethod
@@ -34,6 +52,29 @@ class SearchCreate(BaseModel):
         if v is not None and v > date.today():
             raise ValueError("date_of_birth cannot be in the future")
         return v
+
+    @field_validator("driving_licence_number")
+    @classmethod
+    def normalise_licence_number(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = re.sub(r"[\s-]", "", v).upper()
+        if not v:
+            return None
+        if not _LICENCE_NUMBER_RE.fullmatch(v):
+            raise ValueError(
+                "driving_licence_number must be 8-18 letters/digits"
+            )
+        return v
+
+    @model_validator(mode="after")
+    def licence_requires_consent(self) -> "SearchCreate":
+        if self.driving_licence_number and not self.licence_check_consent:
+            raise ValueError(
+                "licence_check_consent is required when a driving licence "
+                "number is supplied (the driver must have consented to the check)"
+            )
+        return self
 
 
 class SearchOut(BaseModel):

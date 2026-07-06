@@ -32,6 +32,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   adverse_media: "Adverse media",
   directorship: "Directorship",
   web: "Web",
+  driving_licence: "Driving licence",
+  driving_licence_issue: "Licence issue",
+  driving_endorsement: "Endorsement",
+  driving_disqualification: "Driving ban",
 };
 
 // Mirrors the bands in the generated report: a name similarity alone is never

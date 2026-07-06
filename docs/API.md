@@ -14,9 +14,15 @@ Content-Type: application/json
 {
   "full_name": "John Smith",          // required, 2-200 chars
   "date_of_birth": "1975-03-02",      // optional, ISO date, not in future
-  "country": "United Kingdom"          // optional
+  "country": "United Kingdom",         // optional
+  "driving_licence_number": "SMITH753020J99AB",  // optional — enables DVLA check
+  "licence_check_consent": true        // mandatory when a licence number is given
 }
 ```
+
+Supplying `driving_licence_number` without `licence_check_consent: true` is a
+`422` — the driver's consent attestation is recorded in the audit log (the
+licence number itself is never audited or logged).
 
 **202 Accepted** — returns immediately with the job:
 

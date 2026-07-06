@@ -34,6 +34,9 @@ class Search(Base):
     full_name: Mapped[str] = mapped_column(EncryptedString, nullable=False)
     date_of_birth: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
     country: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Optional — enables the DVLA licence check. Encrypted: the number itself
+    # encodes the holder's name and date of birth.
+    driving_licence_number: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
 
     status: Mapped[str] = mapped_column(
         String(16), default=SearchStatus.PENDING.value, nullable=False, index=True

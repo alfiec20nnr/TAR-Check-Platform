@@ -63,7 +63,9 @@ terminal.
 ## Extending with a new connector
 
 1. Subclass `BaseConnector` in `app/connectors/your_source.py` — implement
-   `fetch()` (and optionally `mock_findings()` / `is_configured()`).
+   `fetch()` (and optionally `mock_findings()` / `is_configured()` /
+   `applies_to()` for identifier-driven checks like the DVLA licence lookup,
+   which skip subjects that did not supply the identifier).
 2. Append the class to `CONNECTOR_CLASSES` in `app/connectors/registry.py`.
 3. Restart; the seed step registers it in the `sources` table automatically.
 

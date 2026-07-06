@@ -7,6 +7,10 @@ export interface SearchCreate {
   full_name: string;
   date_of_birth?: string | null;
   country?: string | null;
+  /** Optional — enables the DVLA driving licence check. */
+  driving_licence_number?: string | null;
+  /** Required attestation whenever a licence number is supplied. */
+  licence_check_consent?: boolean;
 }
 
 export interface SearchOut {

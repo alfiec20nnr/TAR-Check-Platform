@@ -10,6 +10,11 @@ categories:
   adverse_media: 20      # general negative media; escalated by keywords below
   directorship: 5        # informational — directorships are not adverse per se
   web: 5
+  # DVLA driving licence check (only runs when a licence number is supplied):
+  driving_disqualification: 60
+  driving_licence_issue: 40   # revoked / expired / surrendered / not found
+  driving_endorsement: 30
+  driving_licence: 0          # verified-valid — informational only
 
 # Adverse-media escalation: if a finding's title/description contains any of
 # these terms, its weight is raised to `weight` (serious adverse media).

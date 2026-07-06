@@ -52,8 +52,18 @@ Set `MOCK_CONNECTORS=false` and provide keys in `.env`:
 | FCA register | `FCA_API_EMAIL`, `FCA_API_KEY` | register.fca.org.uk/Developer |
 | UK Sanctions List | **none — works out of the box** | Live FCDO XML feed (default URL); a licensed provider JSON endpoint also works |
 | Insolvency Register | `INSOLVENCY_API_URL`, `INSOLVENCY_API_KEY` | licensed data provider of your choice |
+| DVLA Driving Licence (ADD) | `DVLA_USERNAME`, `DVLA_PASSWORD`, `DVLA_API_KEY` (+ `DVLA_API_BASE_URL` for prod) | Commercial agreement with DVLA ([developer portal](https://developer-portal.driver-vehicle-licensing.api.gov.uk/)); UAT is the default environment |
 
 Connectors without credentials are skipped gracefully; the rest still run.
+
+**DVLA driving licence check** — optional per search: supply a driving licence
+number (plus a mandatory driver-consent attestation, recorded in the audit
+log) and the DVLA connector verifies validity and surfaces entitlements,
+endorsements, and disqualifications as weighted findings. Searches without a
+licence number are completely unaffected. The licence number is encrypted at
+rest and never appears in logs, audit entries, or error messages; the driver's
+address returned by DVLA is deliberately not stored. Note DVLA passwords
+expire every 90 days.
 
 For AI summaries set `ANTHROPIC_API_KEY` (model configurable via `AI_MODEL`,
 default `claude-opus-4-8`). Without a key, a clearly-labelled non-AI template

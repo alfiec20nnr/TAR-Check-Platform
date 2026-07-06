@@ -147,8 +147,57 @@ async def test_sources_registry(client):
         "insolvency_register",
         "uk_sanctions",
         "fca_warning_list",
+        "dvla_add",
     }
     assert all(s["enabled"] for s in sources)
+
+
+async def test_licence_number_requires_consent(client):
+    resp = await client.post(
+        "/api/v1/searches",
+        json={"full_name": "Jane Doe", "driving_licence_number": "DOE99801045JA9AB"},
+    )
+    assert resp.status_code == 422
+    assert "consent" in resp.text.lower()
+
+    bad_format = await client.post(
+        "/api/v1/searches",
+        json={
+            "full_name": "Jane Doe",
+            "driving_licence_number": "??!",
+            "licence_check_consent": True,
+        },
+    )
+    assert bad_format.status_code == 422
+
+
+async def test_dvla_check_runs_when_licence_supplied(client):
+    """Mock-mode pipeline: DVLA findings appear only with a licence number,
+    and the consent attestation is audited (never the number itself)."""
+    with_licence = await submit_and_wait(
+        client,
+        {
+            "full_name": "Jane Doe",
+            "date_of_birth": "1980-04-12",
+            "driving_licence_number": "DOE 998010 45JA 9AB",  # normalised server-side
+            "licence_check_consent": True,
+        },
+    )
+    assert with_licence["status"] == "completed"
+    dvla_results = [r for r in with_licence["results"] if r["source_name"] == "dvla_add"]
+    assert dvla_results, "expected DVLA findings when a licence number is supplied"
+    assert any(r["category"].startswith("driving_") for r in dvla_results)
+
+    without_licence = await submit_and_wait(client, {"full_name": "Jane Doe"})
+    assert not any(
+        r["source_name"] == "dvla_add" for r in without_licence["results"]
+    )
+
+    entries = (await client.get(f"/api/v1/audit?search_id={with_licence['id']}")).json()
+    submitted = next(e for e in entries if e["action"] == "search_submitted")
+    assert submitted["details"]["licence_check_requested"] is True
+    assert submitted["details"]["licence_check_consent"] is True
+    assert "DOE99801045JA9AB" not in str(submitted["details"])
 
 
 async def test_audit_trail_written(client):

@@ -193,6 +193,63 @@ def sanctions_mock(subject: SearchSubject) -> list[Finding]:
     return []
 
 
+def dvla_mock(subject: SearchSubject) -> list[Finding]:
+    """Only produced when a licence number was supplied (applies_to gates it)."""
+    name = subject.full_name
+    p = profile_for(subject)
+    verified = Finding(
+        source="dvla_add",
+        category=Category.DRIVING_LICENCE,
+        title="Driving licence verified — status: Valid",
+        description="Full licence, status Valid. Entitlement categories: B, B1.",
+        url="https://www.gov.uk/view-driving-licence",
+        subject_name=name,
+        date_of_birth=subject.date_of_birth,
+        raw={"mock": True, "licence_status": "Valid", "licence_type": "Full"},
+    )
+    findings = [verified]
+    if p >= MEDIA:
+        findings.append(
+            Finding(
+                source="dvla_add",
+                category=Category.DRIVING_ENDORSEMENT,
+                title="Driving endorsement SP30 — 3 penalty points",
+                description="Exceeding statutory speed limit on a public road.",
+                url="https://www.gov.uk/view-driving-licence",
+                date="2023-09-14",
+                subject_name=name,
+                date_of_birth=subject.date_of_birth,
+                raw={"mock": True, "offence_code": "SP30", "penalty_points": 3},
+            )
+        )
+    if p == SEVERE:
+        findings[0] = Finding(
+            source="dvla_add",
+            category=Category.DRIVING_LICENCE_ISSUE,
+            title="Driving licence verified — status: Revoked",
+            description="Full licence, status Revoked.",
+            url="https://www.gov.uk/view-driving-licence",
+            subject_name=name,
+            date_of_birth=subject.date_of_birth,
+            raw={"mock": True, "licence_status": "Revoked", "licence_type": "Full"},
+        )
+        findings.append(
+            Finding(
+                source="dvla_add",
+                category=Category.DRIVING_DISQUALIFICATION,
+                title="Driving disqualification — DR10",
+                description="Driving or attempting to drive with alcohol above limit.",
+                url="https://www.gov.uk/view-driving-licence",
+                date="2022-06-30",
+                subject_name=name,
+                date_of_birth=subject.date_of_birth,
+                raw={"mock": True, "offence_code": "DR10",
+                     "disqualification": {"months": 18}},
+            )
+        )
+    return findings
+
+
 def fca_mock(subject: SearchSubject) -> list[Finding]:
     name = subject.full_name
     if profile_for(subject) >= INSOLVENCY:
