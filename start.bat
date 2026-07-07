@@ -41,15 +41,38 @@ echo [1/4] Web interface already built.
 :frontend_done
 
 REM ---- Python environment -----------------------------------------------------
+REM Note: .venv folders cannot be copied between computers - if this project
+REM was moved from another machine, the checks below detect the stale
+REM environment and rebuild it automatically.
 cd backend
-if exist ".venv\Scripts\python.exe" goto venv_ok
-echo [2/4] Creating Python environment - first run only...
+set "VENV_REBUILT="
+
+:venv_check
+if not exist ".venv\Scripts\python.exe" goto venv_create
+".venv\Scripts\python.exe" -c "import sys" >nul 2>nul
+if errorlevel 1 goto venv_rebuild
+goto venv_ready
+
+:venv_rebuild
+if defined VENV_REBUILT goto fail
+set "VENV_REBUILT=1"
+echo The Python environment is from another computer or is damaged.
+echo Rebuilding it fresh - this takes a few minutes...
+rmdir /s /q .venv
+
+:venv_create
+echo [2/4] Creating Python environment...
 %PYTHON% -m venv .venv
 if errorlevel 1 goto fail
-:venv_ok
+
+:venv_ready
 echo [2/4] Installing dependencies - can take a few minutes on first run...
 ".venv\Scripts\python.exe" -m pip install -q -r requirements.txt
-if errorlevel 1 goto fail
+if errorlevel 1 goto venv_rebuild
+REM Verify the key packages actually import - catches half-copied or
+REM half-synced environments that pip alone does not notice.
+".venv\Scripts\python.exe" -c "import aiosqlite, fastapi, uvicorn, alembic" >nul 2>nul
+if errorlevel 1 goto venv_rebuild
 
 REM ---- Database + configuration ------------------------------------------------
 REM Single-process mode: local SQLite database file, pipeline runs in-process.

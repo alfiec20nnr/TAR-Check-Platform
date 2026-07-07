@@ -27,12 +27,24 @@ else
 fi
 
 cd backend
+# .venv folders cannot be copied between computers - rebuild if stale/damaged.
+if [ -e .venv ] && ! .venv/bin/python -c "import sys" >/dev/null 2>&1; then
+    echo "The Python environment is from another computer or damaged - rebuilding..."
+    rm -rf .venv
+fi
 if [ ! -x .venv/bin/python ]; then
     echo "[2/4] Creating Python environment (first run only)..."
     python3 -m venv .venv
 fi
 echo "[2/4] Installing/updating dependencies..."
 .venv/bin/python -m pip install -q -r requirements.txt
+# Catch half-copied/half-synced environments that pip alone does not notice.
+if ! .venv/bin/python -c "import aiosqlite, fastapi, uvicorn, alembic" >/dev/null 2>&1; then
+    echo "Environment verification failed - rebuilding fresh..."
+    rm -rf .venv
+    python3 -m venv .venv
+    .venv/bin/python -m pip install -q -r requirements.txt
+fi
 
 # Single-process mode: SQLite database, pipeline runs in-process. All other
 # settings (API keys etc.) come from the .env file at the project root.

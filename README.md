@@ -37,6 +37,13 @@ file (`backend/aip.sqlite3`) — settings and API keys still come from the same
 PDF export is unavailable on Windows (download reports as HTML or JSON
 instead), and the database is a local file rather than a PostgreSQL server.
 
+**Moving to another computer:** copy the whole folder, install Python (and
+Node.js) there, and run `start.bat`. Python environments (`backend/.venv`)
+don't survive the move — the start scripts detect this and rebuild
+automatically on first run. `backend/aip.sqlite3` carries your search history
+with it; it stays readable as long as the same `.env` (`ENCRYPTION_KEY`)
+travels with it.
+
 ## Quick start (Docker Compose)
 
 ```bash
