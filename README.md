@@ -22,6 +22,12 @@ Then just **double-click `start.bat`** (Windows) or run `./start.sh`
 after that it starts in seconds and opens http://localhost:8000 in your
 browser. Close the window to stop.
 
+Prefer no terminal window at all? Double-click **`start-hidden.vbs`** instead —
+it shows the window on the very first run (so you can watch setup), then
+launches silently ever after; stop it with **`stop.bat`**. Both files are ideal
+targets for desktop shortcuts (right-click → Send to → Desktop). If a silent
+start ever misbehaves, run `start.bat` directly to see what's happening.
+
 This runs the whole platform as a single process with a local SQLite database
 file (`backend/aip.sqlite3`) — settings and API keys still come from the same
 `.env` file. Ideal for one machine / a small team. Limitations vs Docker:
