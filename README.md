@@ -11,6 +11,23 @@ supplier vetting, recruitment screening (where legally permitted), and
 reputational risk assessment. Runs locally or inside a single trusted
 organisation network — **no accounts, no authentication, not multi-tenant**.
 
+## Easiest start (no Docker) — recommended for non-technical users
+
+One-time setup: install [Python 3.11+](https://www.python.org/downloads/)
+(tick **"Add Python to PATH"**) and [Node.js LTS](https://nodejs.org) with
+their standard installers.
+
+Then just **double-click `start.bat`** (Windows) or run `./start.sh`
+(macOS/Linux). The first run builds everything automatically (a few minutes);
+after that it starts in seconds and opens http://localhost:8000 in your
+browser. Close the window to stop.
+
+This runs the whole platform as a single process with a local SQLite database
+file (`backend/aip.sqlite3`) — settings and API keys still come from the same
+`.env` file. Ideal for one machine / a small team. Limitations vs Docker:
+PDF export is unavailable on Windows (download reports as HTML or JSON
+instead), and the database is a local file rather than a PostgreSQL server.
+
 ## Quick start (Docker Compose)
 
 ```bash

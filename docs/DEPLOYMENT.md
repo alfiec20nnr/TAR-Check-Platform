@@ -3,6 +3,12 @@
 The platform deploys with Docker Compose on a local machine or a single host.
 Kubernetes and cloud-specific targets are deliberately out of MVP scope.
 
+> **No Docker?** For a single machine or a small team, the one-click
+> `start.bat` / `start.sh` at the repo root runs the entire platform as one
+> Python process with SQLite — see "Easiest start" in the README. Docker
+> remains the recommended path for a shared server (PostgreSQL, separate
+> worker, nginx, PDF export).
+
 ## 1. Prerequisites
 
 - Docker Engine + Compose v2

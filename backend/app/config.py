@@ -15,7 +15,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    # Both the repo-root .env (used by the no-Docker start scripts, which run
+    # from backend/) and a backend-local .env are honoured; the local one wins.
+    model_config = SettingsConfigDict(
+        env_file=("../.env", ".env"), env_file_encoding="utf-8", extra="ignore"
+    )
 
     app_name: str = "Adverse Intelligence Platform"
     debug: bool = False
