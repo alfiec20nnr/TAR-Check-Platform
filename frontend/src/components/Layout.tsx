@@ -15,10 +15,41 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import { useEffect } from "react";
 import { Link as RouterLink, Outlet, useLocation } from "react-router-dom";
 
 import { useHealth } from "../api/hooks";
 import { useColorMode } from "../theme";
+
+/** Lets the single-process (no-Docker) server stop itself when the last tab
+ *  closes: announce open/close, and heartbeat while the tab is alive. All
+ *  no-ops server-side when auto-shutdown mode is off (e.g. Docker). */
+function useSessionPresence() {
+  useEffect(() => {
+    const open = () => {
+      void fetch("/api/v1/session/open", { method: "POST" }).catch(() => {});
+    };
+    const onPageShow = (e: PageTransitionEvent) => {
+      // Initial load is counted by the mount below; only re-announce when the
+      // page is restored from the back/forward cache.
+      if (e.persisted) open();
+    };
+    const onPageHide = () => {
+      navigator.sendBeacon("/api/v1/session/close");
+    };
+    open();
+    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("pagehide", onPageHide);
+    const heartbeat = setInterval(() => {
+      void fetch("/health").catch(() => {});
+    }, 15_000);
+    return () => {
+      window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("pagehide", onPageHide);
+      clearInterval(heartbeat);
+    };
+  }, []);
+}
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: <SpaceDashboardIcon fontSize="small" /> },
@@ -30,6 +61,7 @@ export default function Layout() {
   const { mode, toggle } = useColorMode();
   const location = useLocation();
   const { data: health } = useHealth();
+  useSessionPresence();
 
   return (
     <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>

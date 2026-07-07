@@ -38,6 +38,7 @@ echo "[2/4] Installing/updating dependencies..."
 # settings (API keys etc.) come from the .env file at the project root.
 export DATABASE_URL="sqlite+aiosqlite:///./aip.sqlite3"
 export INLINE_WORKER=true
+export AUTO_SHUTDOWN_AFTER_SECONDS=90
 
 echo "[3/4] Preparing the database..."
 .venv/bin/python -m alembic upgrade head

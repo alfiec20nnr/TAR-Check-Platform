@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://localhost:8080"
     api_rate_limit: str = "60/minute"
 
+    # Single-process mode: stop the server automatically once no browser tab
+    # has been open/active for this many seconds (0 = never; Docker uses 0).
+    auto_shutdown_after_seconds: int = 0
+
     # Pipeline behaviour
     inline_worker: bool = False
     mock_connectors: bool = True

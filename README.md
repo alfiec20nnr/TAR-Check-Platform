@@ -24,9 +24,12 @@ browser. Close the window to stop.
 
 Prefer no terminal window at all? Double-click **`start-hidden.vbs`** instead —
 it shows the window on the very first run (so you can watch setup), then
-launches silently ever after; stop it with **`stop.bat`**. Both files are ideal
-targets for desktop shortcuts (right-click → Send to → Desktop). If a silent
-start ever misbehaves, run `start.bat` directly to see what's happening.
+launches silently ever after. **Stopping is automatic**: close the platform's
+browser tab and the server shuts itself down within about half a minute (it
+always lets any in-progress search finish first; if the browser crashes, a
+90-second no-activity fallback kicks in). It's an ideal target for a desktop
+shortcut (right-click → Send to → Desktop). If a silent start ever misbehaves,
+run `start.bat` directly to see what's happening.
 
 This runs the whole platform as a single process with a local SQLite database
 file (`backend/aip.sqlite3`) — settings and API keys still come from the same

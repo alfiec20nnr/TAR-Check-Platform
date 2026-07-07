@@ -6,7 +6,11 @@ rate limiting, CORS, security headers, parameterised queries (SQLAlchemy),
 and encryption-at-rest for personal data.
 """
 
+import asyncio
 import logging
+import os
+import signal
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -51,13 +55,128 @@ app.add_middleware(
 )
 
 
+# --- Auto-shutdown (single-process / no-Docker mode) ---------------------------
+# The UI heartbeats while a tab is open and beacons when one closes. Once no
+# tab remains and requests stop, the server exits by itself — no stop script
+# needed. Disabled unless AUTO_SHUTDOWN_AFTER_SECONDS is set (Docker never
+# sets it). A running search always defers shutdown.
+
+
+class AutoShutdownState:
+    TAB_CLOSE_GRACE = 15.0  # ride out refreshes/navigation
+    IDLE_WITH_NO_TABS = 20.0  # and require requests to have actually stopped
+
+    def __init__(self, idle_timeout: float):
+        self.idle_timeout = idle_timeout  # hard fallback (browser crash/kill)
+        self.last_seen = time.monotonic()
+        self.open_tabs = 0
+        self.ever_opened = False
+        self._zero_since: float | None = None
+
+    def touch(self) -> None:
+        self.last_seen = time.monotonic()
+
+    def tab_opened(self) -> None:
+        self.open_tabs += 1
+        self.ever_opened = True
+        self.touch()
+
+    def tab_closed(self) -> None:
+        self.open_tabs = max(0, self.open_tabs - 1)
+        self.touch()
+
+    def due(self, now: float | None = None) -> bool:
+        now = time.monotonic() if now is None else now
+        if now - self.last_seen >= self.idle_timeout:
+            return True
+        if not self.ever_opened or self.open_tabs > 0:
+            self._zero_since = None
+            return False
+        if self._zero_since is None:
+            self._zero_since = now
+        return (
+            now - self._zero_since >= self.TAB_CLOSE_GRACE
+            and now - self.last_seen >= self.IDLE_WITH_NO_TABS
+        )
+
+
+_shutdown_state: AutoShutdownState | None = (
+    AutoShutdownState(float(settings.auto_shutdown_after_seconds))
+    if settings.auto_shutdown_after_seconds > 0
+    else None
+)
+
+
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
+    if _shutdown_state is not None:
+        _shutdown_state.touch()
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
     return response
+
+
+@app.post("/api/v1/session/open", status_code=204, tags=["session"])
+async def session_open() -> None:
+    """Browser tab opened (no-op unless auto-shutdown mode is active)."""
+    if _shutdown_state is not None:
+        _shutdown_state.tab_opened()
+
+
+@app.post("/api/v1/session/close", status_code=204, tags=["session"])
+async def session_close() -> None:
+    """Browser tab closed (sent via sendBeacon on pagehide)."""
+    if _shutdown_state is not None:
+        _shutdown_state.tab_closed()
+
+
+async def _has_active_searches() -> bool:
+    from sqlalchemy import func, select
+
+    from app.database import get_session_factory
+    from app.models import Search, SearchStatus
+
+    async with get_session_factory()() as session:
+        count = (
+            await session.execute(
+                select(func.count())
+                .select_from(Search)
+                .where(
+                    Search.status.in_(
+                        (SearchStatus.PENDING.value, SearchStatus.RUNNING.value)
+                    )
+                )
+            )
+        ).scalar_one()
+    return bool(count)
+
+
+@app.on_event("startup")
+async def _start_auto_shutdown_watchdog() -> None:
+    if _shutdown_state is None:
+        return
+    logger = logging.getLogger(__name__)
+    logger.info(
+        "Auto-shutdown armed: stopping when the browser closes "
+        "(fallback after %ss of no activity)",
+        settings.auto_shutdown_after_seconds,
+    )
+
+    async def watchdog() -> None:
+        while True:
+            await asyncio.sleep(3)
+            if not _shutdown_state.due():
+                continue
+            if await _has_active_searches():
+                continue  # never cut a search short
+            logger.info("Browser closed and no activity — shutting down")
+            signal.raise_signal(signal.SIGINT)  # graceful uvicorn stop
+            await asyncio.sleep(10)
+            os._exit(0)  # hard fallback if graceful stop stalls
+
+    asyncio.get_running_loop().create_task(watchdog())
 
 
 app.include_router(searches.router, prefix="/api/v1")

@@ -57,6 +57,7 @@ REM All other settings such as API keys are read from the .env file at the
 REM project root - the same file Docker uses.
 set "DATABASE_URL=sqlite+aiosqlite:///./aip.sqlite3"
 set "INLINE_WORKER=true"
+set "AUTO_SHUTDOWN_AFTER_SECONDS=90"
 
 echo [3/4] Preparing the database...
 ".venv\Scripts\python.exe" -m alembic upgrade head
@@ -71,14 +72,15 @@ echo   Adverse Intelligence Platform is running.
 echo   Open your browser at:  http://localhost:8000
 echo   A browser tab will open automatically.
 echo.
-echo   Keep this window open. Close it to stop the platform.
+echo   The platform stops by itself shortly after you close its
+echo   browser tab. Closing this window also stops it.
 echo  ============================================================
 echo.
 start "" http://localhost:8000
 ".venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 echo.
 echo  The platform has stopped.
-pause
+ping -n 3 127.0.0.1 >nul
 exit /b 0
 
 :nopython
