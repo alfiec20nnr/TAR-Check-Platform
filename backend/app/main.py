@@ -179,6 +179,117 @@ async def _start_auto_shutdown_watchdog() -> None:
     asyncio.get_running_loop().create_task(watchdog())
 
 
+async def _single_process_housekeeping() -> None:
+    """Recovery + retention work the dedicated worker does in the Docker stack.
+
+    Single-process mode has no worker, so at startup the API process itself:
+
+    - Fails searches left pending/running by a previous shutdown or crash.
+      Their in-process pipeline task died with the server, so they could never
+      finish — and a permanently "running" search would also block
+      auto-shutdown forever.
+    - Applies the data-retention policy (children deleted explicitly because
+      SQLite does not enforce ON DELETE CASCADE by default; audit entries are
+      always kept).
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import select
+
+    from app.api.routes.searches import _delete_search_rows
+    from app.database import get_session_factory
+    from app.models import Search, SearchStatus
+    from app.services import audit
+
+    logger = logging.getLogger(__name__)
+    async with get_session_factory()() as session:
+        stale = (
+            (
+                await session.execute(
+                    select(Search).where(
+                        Search.status.in_(
+                            (SearchStatus.PENDING.value, SearchStatus.RUNNING.value)
+                        )
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for search in stale:
+            search.status = SearchStatus.FAILED.value
+            search.error = (
+                "Interrupted — the platform was closed before this search "
+                "finished. Please run the search again."
+            )
+            search.completed_at = datetime.now(UTC)
+            await audit.record(
+                session,
+                "search_failed",
+                search_id=search.id,
+                details={"error": "interrupted by shutdown"},
+            )
+        if stale:
+            logger.warning("Marked %d interrupted search(es) as failed", len(stale))
+
+        cutoff = datetime.now(UTC) - timedelta(days=settings.data_retention_days)
+        expired = list(
+            (
+                await session.execute(
+                    select(Search.id).where(
+                        Search.created_at < cutoff,
+                        Search.status.in_(
+                            (SearchStatus.COMPLETED.value, SearchStatus.FAILED.value)
+                        ),
+                    )
+                )
+            ).scalars()
+        )
+        if expired:
+            await _delete_search_rows(session, expired)
+            await audit.record(
+                session, "retention_applied", details={"deleted": len(expired)}
+            )
+            logger.info("Retention policy removed %d search(es)", len(expired))
+        await session.commit()
+
+
+@app.on_event("startup")
+async def _run_single_process_housekeeping() -> None:
+    if settings.inline_worker:
+        await _single_process_housekeeping()
+
+
+@app.on_event("startup")
+async def _open_browser_when_ready() -> None:
+    """Open the UI once the server is actually reachable (start scripts set
+    OPEN_BROWSER_URL). Polling first avoids the browser racing ahead of the
+    server and showing "connection refused" on a cold start."""
+    url = settings.open_browser_url
+    if not url:
+        return
+
+    async def _poll_then_open() -> None:
+        import webbrowser
+
+        import httpx
+
+        health_url = url.rstrip("/") + "/health"
+        async with httpx.AsyncClient(timeout=1.0) as client:
+            for _ in range(120):
+                try:
+                    await client.get(health_url)
+                    break
+                except httpx.HTTPError:
+                    await asyncio.sleep(0.5)
+            else:
+                return  # never became reachable — give up quietly
+        logging.getLogger(__name__).info("Opening browser at %s", url)
+        webbrowser.open(url)
+
+    asyncio.get_running_loop().create_task(_poll_then_open())
+
+
 app.include_router(searches.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")

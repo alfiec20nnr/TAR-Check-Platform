@@ -11,8 +11,9 @@ htmlcov/
 .ruff_cache/
 
 # Node
+# (frontend/dist is deliberately committed so end users never need Node.js —
+# rebuild with `npm run build` and commit it after changing frontend source)
 node_modules/
-frontend/dist/
 
 # Environment / secrets
 .env
@@ -23,6 +24,9 @@ frontend/dist/
 .idea/
 .vscode/
 
+# Claude Code local settings
+.claude/settings.local.json
+
 # OS
 Thumbs.db
 .DS_Store
@@ -30,3 +34,4 @@ Thumbs.db
 # App artifacts
 backend/reports_out/
 *.sqlite3
+last-run.log

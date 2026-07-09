@@ -12,6 +12,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { reportUrl } from "../api/client";
@@ -23,12 +24,45 @@ import StatusChip from "../components/StatusChip";
 export default function SearchDetailPage() {
   const { searchId } = useParams<{ searchId: string }>();
   const { data, isPending, isError, error } = useSearchDetail(searchId);
+  const [pdfNote, setPdfNote] = useState<string | null>(null);
 
   if (isPending) return <Skeleton variant="rounded" height={300} />;
   if (isError) return <Alert severity="error">{error.message}</Alert>;
   if (!data) return null;
 
   const inProgress = data.status === "pending" || data.status === "running";
+
+  // PDF is generated server-side and is unavailable in some environments
+  // (e.g. the no-Docker Windows setup) — fetch it so a failure can be shown
+  // as a friendly note instead of a raw JSON error page.
+  const downloadPdf = async () => {
+    try {
+      const resp = await fetch(reportUrl(data.id, "pdf"));
+      if (!resp.ok) {
+        let detail =
+          "PDF export is unavailable here — download the report as HTML or JSON instead.";
+        try {
+          const body = await resp.json();
+          if (typeof body.detail === "string") detail = body.detail;
+        } catch {
+          /* non-JSON error body */
+        }
+        setPdfNote(detail);
+        return;
+      }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${data.report_reference ?? "report"}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setPdfNote("PDF download failed — try the HTML or JSON format instead.");
+    }
+  };
 
   return (
     <Grid container spacing={3}>
@@ -89,7 +123,7 @@ export default function SearchDetailPage() {
                     <Button
                       variant="contained"
                       startIcon={<DownloadIcon />}
-                      href={reportUrl(data.id, "pdf")}
+                      onClick={() => void downloadPdf()}
                     >
                       PDF
                     </Button>
@@ -106,6 +140,11 @@ export default function SearchDetailPage() {
                     </Button>
                   </Stack>
                 </Stack>
+                {pdfNote && (
+                  <Alert severity="info" onClose={() => setPdfNote(null)} sx={{ mt: 2 }}>
+                    {pdfNote}
+                  </Alert>
+                )}
               </CardContent>
             </Card>
           </Grid>

@@ -13,36 +13,55 @@ organisation network — **no accounts, no authentication, not multi-tenant**.
 
 ## Easiest start (no Docker) — recommended for non-technical users
 
-One-time setup: install [Python 3.11+](https://www.python.org/downloads/)
-(tick **"Add Python to PATH"**) and [Node.js LTS](https://nodejs.org) with
-their standard installers.
+The only thing to install is [Python 3.11+](https://www.python.org/downloads/)
+— tick **"Add Python to PATH"** in the installer. Nothing else is needed: the
+web interface ships pre-built, so Node.js is *not* required.
 
-Then just **double-click `start.bat`** (Windows) or run `./start.sh`
-(macOS/Linux). The first run builds everything automatically (a few minutes);
-after that it starts in seconds and opens http://localhost:8000 in your
-browser. Close the window to stop.
+1. Get the project: on GitHub choose **Code → Download ZIP**, right-click the
+   ZIP → **Extract All**, and open the extracted folder (or `git clone` it).
+2. Double-click **`start-hidden.vbs`** (Windows). The very first run shows a
+   setup window and takes a few minutes — it downloads Python packages, so it
+   needs an internet connection once. Every run after that starts in seconds,
+   completely silently. It's an ideal target for a desktop shortcut
+   (right-click → Send to → Desktop). Prefer a visible window? Double-click
+   `start.bat` instead (macOS/Linux: run `./start.sh`).
+3. A browser tab opens at http://localhost:8000 by itself once the platform
+   is ready.
 
-Prefer no terminal window at all? Double-click **`start-hidden.vbs`** instead —
-it shows the window on the very first run (so you can watch setup), then
-launches silently ever after. **Stopping is automatic**: close the platform's
-browser tab and the server shuts itself down within about half a minute (it
-always lets any in-progress search finish first; if the browser crashes, a
-90-second no-activity fallback kicks in). It's an ideal target for a desktop
-shortcut (right-click → Send to → Desktop). If a silent start ever misbehaves,
-run `start.bat` directly to see what's happening.
+> **Windows security prompts:** files downloaded from the internet may
+> trigger a one-time "publisher could not be verified" / SmartScreen warning —
+> choose **Run** / **Open**.
+
+**Stopping is automatic**: close the platform's browser tab and the server
+shuts itself down within about half a minute (it always lets any in-progress
+search finish first; if the browser crashes, a 90-second no-activity fallback
+kicks in). Closing the `start.bat` window also stops it. If a silent start
+ever misbehaves, check `last-run.log` in the project folder or run `start.bat`
+directly to watch the output.
+
+On first start the platform creates `.env` from `.env.example` and generates
+an `ENCRYPTION_KEY` in it, so personal data is encrypted at rest out of the
+box — keep `.env` with the database when moving or backing up. It starts in
+**demo mode** (`MOCK_CONNECTORS=true`): connectors return realistic
+*simulated* data so the full pipeline works with zero API keys, and the UI
+and reports show a demo banner. See "Going live with real sources" below.
 
 This runs the whole platform as a single process with a local SQLite database
 file (`backend/aip.sqlite3`) — settings and API keys still come from the same
-`.env` file. Ideal for one machine / a small team. Limitations vs Docker:
-PDF export is unavailable on Windows (download reports as HTML or JSON
-instead), and the database is a local file rather than a PostgreSQL server.
+`.env` file. The Python packages live in a per-machine folder
+(`%USERPROFILE%\.aip` on Windows, `~/.local/share/adverse-intelligence-platform`
+on macOS/Linux), *outside* the project folder, so it's fine to keep the
+project in a OneDrive/Dropbox-synced location — cloud sync never slows
+startup down. Ideal for one machine / a
+small team. Limitations vs Docker: PDF export is unavailable on Windows
+(download reports as HTML or JSON instead), and the database is a local file
+rather than a PostgreSQL server.
 
-**Moving to another computer:** copy the whole folder, install Python (and
-Node.js) there, and run `start.bat`. Python environments (`backend/.venv`)
-don't survive the move — the start scripts detect this and rebuild
-automatically on first run. `backend/aip.sqlite3` carries your search history
-with it; it stays readable as long as the same `.env` (`ENCRYPTION_KEY`)
-travels with it.
+**Moving to another computer:** copy the whole folder, install Python there,
+and run it as above — the Python environment is per-machine and is set up
+automatically on the first run. `backend/aip.sqlite3` carries your search
+history with it; it stays readable as long as the same `.env`
+(`ENCRYPTION_KEY`) travels with it.
 
 ## Quick start (Docker Compose)
 
@@ -125,10 +144,14 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
+The built UI (`frontend/dist`) is committed so end users never need Node.js —
+after changing frontend source, run `npm run build` and commit the updated
+`frontend/dist` alongside your change.
+
 ## Tests
 
 ```bash
-cd backend && pytest --cov=app          # 56 tests, ~87% coverage
+cd backend && pytest --cov=app          # unit + API tests with coverage
 cd frontend && npm test                 # component tests (vitest)
 ```
 

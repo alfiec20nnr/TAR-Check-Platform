@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     # has been open/active for this many seconds (0 = never; Docker uses 0).
     auto_shutdown_after_seconds: int = 0
 
+    # Single-process mode: open this URL in the default browser once the
+    # server is reachable (empty = don't; set by the start scripts).
+    open_browser_url: str = ""
+
     # Pipeline behaviour
     inline_worker: bool = False
     mock_connectors: bool = True
