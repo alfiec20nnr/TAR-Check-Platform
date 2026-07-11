@@ -344,6 +344,89 @@ async def test_companies_house_screens_out_other_names():
     assert [f.subject_name for f in result.findings] == ["Philip GREEN"]
 
 
+async def test_social_media_skipped_without_brave_key():
+    from app.connectors.social_media import SocialMediaConnector
+
+    connector = SocialMediaConnector(real_settings(brave_api_key=""))
+    result = await connector.run(SUBJECT)
+    assert result.status == ConnectorStatus.SKIPPED
+
+
+@respx.mock
+async def test_social_media_queries_each_platform(monkeypatch):
+    from app.connectors import brave_search
+    from app.connectors.social_media import SocialMediaConnector
+
+    monkeypatch.setattr(brave_search, "_QUERY_SPACING_SECONDS", 0.0)
+    monkeypatch.setattr(brave_search, "_limiters", {})
+    route = respx.get("https://api.search.brave.com/res/v1/web/search").mock(
+        return_value=httpx.Response(200, json={"web": {"results": []}})
+    )
+    connector = SocialMediaConnector(
+        real_settings(brave_api_key="k", social_media_sites="x.com, reddit.com")
+    )
+    result = await connector.run(SUBJECT)
+    assert result.status == ConnectorStatus.SUCCESS
+    queries = [httpx.QueryParams(c.request.url.query).get("q") for c in route.calls]
+    assert queries == ['"Test Person" site:x.com', '"Test Person" site:reddit.com']
+
+
+@respx.mock
+async def test_social_media_categorises_and_filters(monkeypatch):
+    """Conduct-term posts escalate to adverse_media; neutral profiles stay
+    social_media; results that never mention the subject or come from another
+    host are dropped."""
+    from app.connectors import brave_search
+    from app.connectors.social_media import SocialMediaConnector
+
+    monkeypatch.setattr(brave_search, "_QUERY_SPACING_SECONDS", 0.0)
+    monkeypatch.setattr(brave_search, "_limiters", {})
+    respx.get("https://api.search.brave.com/res/v1/web/search").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "web": {
+                    "results": [
+                        {
+                            "title": "Test Person (@testperson) — X",
+                            "description": "Posts by Test Person.",
+                            "url": "https://x.com/testperson",
+                        },
+                        {
+                            "title": "Thread: racist posts by Test Person",
+                            "description": "Users report abusive posts by Test Person.",
+                            "url": "https://x.com/testperson/status/1",
+                            "page_age": "2025-02-03T00:00:00",
+                        },
+                        {
+                            "title": "Unrelated account",
+                            "description": "Nothing to do with the subject.",
+                            "url": "https://x.com/someoneelse",
+                        },
+                        {
+                            "title": "Test Person mirror page",
+                            "description": "Scraped copy about Test Person.",
+                            "url": "https://not-x.example.com/testperson",
+                        },
+                    ]
+                }
+            },
+        )
+    )
+    connector = SocialMediaConnector(
+        real_settings(brave_api_key="k", social_media_sites="x.com")
+    )
+    result = await connector.run(SUBJECT)
+    assert result.status == ConnectorStatus.SUCCESS
+    by_url = {f.url: f for f in result.findings}
+    assert set(by_url) == {"https://x.com/testperson", "https://x.com/testperson/status/1"}
+    assert by_url["https://x.com/testperson"].category == Category.SOCIAL_MEDIA
+    assert by_url["https://x.com/testperson/status/1"].category == Category.ADVERSE_MEDIA
+    assert by_url["https://x.com/testperson/status/1"].date == "2025-02-03"
+    assert all(f.subject_name is None for f in result.findings)
+    assert by_url["https://x.com/testperson"].raw["platform"] == "X (Twitter)"
+
+
 @pytest.mark.parametrize("cls", CONNECTOR_CLASSES)
 async def test_every_connector_declares_metadata(cls):
     assert cls.name != "base"

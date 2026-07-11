@@ -1,5 +1,7 @@
 """Report retrieval endpoints (JSON / HTML / PDF)."""
 
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy import select
@@ -34,9 +36,10 @@ async def get_report(
     if format == "html":
         return HTMLResponse(content=report.html_content)
 
-    # PDF: generated on demand from the stored HTML.
+    # PDF: generated on demand from the stored HTML. Rendering shells out to a
+    # browser / native libraries, so it runs in a thread off the event loop.
     try:
-        pdf_bytes = render_pdf(report.html_content)
+        pdf_bytes = await asyncio.to_thread(render_pdf, report.html_content)
     except RuntimeError as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
     return Response(

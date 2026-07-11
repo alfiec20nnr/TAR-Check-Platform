@@ -20,6 +20,12 @@ cd /d "%~dp0"
 REM ---- Guard: the whole project folder must be here, not just this file ------
 if not exist "backend\requirements.txt" goto notextracted
 
+REM ---- Already running? Open its browser tab instead of failing --------------
+REM The health check only answers if the platform is up (curl ships with
+REM Windows 10+; if curl is somehow missing this check is skipped harmlessly).
+curl -s -o nul --max-time 2 http://127.0.0.1:8000/health 2>nul
+if not errorlevel 1 goto alreadyrunning
+
 REM ---- Create .env from example if missing ------------------------------------
 if not exist ".env" (
     if exist ".env.example" (
@@ -92,6 +98,10 @@ echo [2/4] Creating Python environment...
 if errorlevel 1 goto fail
 
 :venv_ready
+REM Skip the slow pip run entirely when requirements.txt has not changed
+REM since the last successful install (the stamp is a copy taken on success).
+fc /b requirements.txt "%VENV%\requirements.stamp" >nul 2>nul
+if not errorlevel 1 goto deps_ready
 echo [2/4] Installing dependencies - can take a few minutes on first run...
 "%VENVPY%" -m pip install -q -r requirements.txt
 if errorlevel 1 goto venv_rebuild
@@ -99,10 +109,9 @@ REM Verify the key packages actually import - catches interrupted or
 REM half-finished installs that pip alone does not notice.
 "%VENVPY%" -c "import aiosqlite, fastapi, uvicorn, alembic" >nul 2>nul
 if errorlevel 1 goto venv_rebuild
-
-REM ---- Encryption key: generated on first run so personal data is encrypted
-REM ---- at rest. An existing key in .env is never overwritten.
-"%VENVPY%" -m app.ensure_key
+copy /y requirements.txt "%VENV%\requirements.stamp" >nul
+:deps_ready
+echo [2/4] Python environment ready.
 
 REM ---- Database + configuration ------------------------------------------------
 REM Single-process mode: local SQLite database file, pipeline runs in-process.
@@ -113,16 +122,10 @@ set "INLINE_WORKER=true"
 set "AUTO_SHUTDOWN_AFTER_SECONDS=90"
 set "OPEN_BROWSER_URL=http://localhost:8000"
 
-echo [3/4] Preparing the database...
-"%VENVPY%" -m alembic upgrade head
-if errorlevel 1 goto fail
-"%VENVPY%" -m app.seed
-if errorlevel 1 goto fail
-
-echo [4/4] Starting the platform...
+echo [3/4] Preparing the database and starting the platform...
 echo.
 echo  ============================================================
-echo   Adverse Intelligence Platform is running.
+echo   Adverse Intelligence Platform is starting.
 echo   A browser tab will open automatically once it is ready at:
 echo   http://localhost:8000
 echo.
@@ -130,11 +133,34 @@ echo   The platform stops by itself shortly after you close its
 echo   browser tab. Closing this window also stops it.
 echo  ============================================================
 echo.
-"%VENVPY%" -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+REM One interpreter does everything - encryption key, database migrations,
+REM connector seeding, then the web server (see backend/app/launch.py).
+"%VENVPY%" -m app.launch
+if errorlevel 1 goto serverfail
 echo.
 echo  The platform has stopped.
 ping -n 3 127.0.0.1 >nul
 exit /b 0
+
+:alreadyrunning
+echo.
+echo  The platform is already running - opening it in your browser...
+echo  (Nothing else to do; this window will close by itself.)
+start "" http://localhost:8000
+ping -n 4 127.0.0.1 >nul
+exit /b 0
+
+:serverfail
+echo.
+echo  The platform could not start, or stopped unexpectedly - see the
+echo  messages above.
+echo    - If another program is using port 8000, close it and try again.
+echo    - If the Python environment looks damaged, delete this folder and
+echo      run start.bat again to rebuild it:
+echo        %VENV%
+echo.
+if not defined AIP_NO_PAUSE pause
+exit /b 1
 
 :notextracted
 echo.
@@ -179,7 +205,7 @@ exit /b 1
 :fail
 echo.
 echo  Something went wrong - see the messages above.
-echo  If you are stuck, send a screenshot of this window (or the file
-echo  last-run.log in this folder) to your technical contact.
+echo  If you are stuck, send a screenshot of this window to your
+echo  technical contact.
 if not defined AIP_NO_PAUSE pause
 exit /b 1

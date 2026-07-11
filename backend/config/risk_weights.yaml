@@ -10,6 +10,8 @@ categories:
   adverse_media: 20      # general negative media; escalated by keywords below
   directorship: 5        # informational — directorships are not adverse per se
   web: 5
+  social_media: 5        # neutral public profiles/posts; posts containing
+                         # adverse/conduct terms arrive as adverse_media instead
   # DVLA driving licence check (only runs when a licence number is supplied):
   driving_disqualification: 60
   driving_licence_issue: 40   # revoked / expired / surrendered / not found
@@ -32,6 +34,116 @@ media_keywords:
       - sanctions violation
       - insider trading
       - tax evasion
+      - ban
+      - Ban
+      - criminal
+      - conviction
+      - arrest
+      - jail
+      - prison
+      - murder
+      - assault
+      - extortion
+      - blackmail
+      - racketeering
+      - organized crime
+      - conspiracy
+      - forgery
+      - counterfeiting
+      - identity theft
+      - wire fraud
+      - securities fraud
+      - accounting fraud
+      - mortgage fraud
+      - insurance fraud
+      - healthcare fraud
+      - procurement fraud
+      - procurement corruption
+      - kickback
+      - bid rigging
+      - price fixing
+      - cartel
+      - collusion
+      - monopoly abuse
+      - antitrust violation
+      - market manipulation
+      - tax fraud
+      - tax avoidance
+      - customs fraud
+      - customs evasion
+      - smuggling
+      - illicit finance
+      - illicit enrichment
+      - asset seizure
+      - asset freeze
+      - confiscation
+      - forfeiture
+      - shell company
+      - beneficial ownership
+      - politically exposed person
+      - PEP
+      - proceeds of crime
+      - financial crime
+      - compliance breach
+      - regulatory violation
+      - enforcement action
+      - investigation
+      - indictment
+      - prosecution
+      - guilty plea
+      - guilty verdict
+      - acquittal
+      - sentencing
+      - fine
+      - penalty
+      - warrant
+      - extradition
+      - detention
+      - incarceration
+      - probation
+      - parole
+      - cybercrime
+      - hacking
+      - ransomware
+      - phishing
+      - data breach
+      - cyber fraud
+      - terrorist financing
+      - export control violation
+      - embargo violation
+      - sanctions evasion
+      - human trafficking
+      - drug trafficking
+      - arms trafficking
+      - wildlife trafficking
+      - child exploitation
+      - forced labor
+      - modern slavery
+      - environmental crime
+      - illegal logging
+      - illegal mining
+      - poaching
+      - espionage
+      - liar
+      - lying
+      - lied
+      - deceit
+      - deception
+      - deceptive
+      - deceive
+      - manipulate
+      - manipulation
+      - manipulating
+      - scam
+      - scammer
+      - exploit
+      - exploitation
+      - abuse
+      - abused
+      - victim
+      - false claim
+      - fake claim
+      - faking
 
 # Findings below this identity-match confidence (%) are excluded from scoring.
 confidence_threshold: 40

@@ -17,10 +17,12 @@ from app.connectors.google_search import GoogleSearchConnector
 from app.connectors.insolvency import InsolvencyConnector
 from app.connectors.news_api import NewsApiConnector
 from app.connectors.sanctions import UkSanctionsConnector
+from app.connectors.social_media import SocialMediaConnector
 
 CONNECTOR_CLASSES: list[type[BaseConnector]] = [
     BraveSearchConnector,
     GoogleSearchConnector,
+    SocialMediaConnector,
     NewsApiConnector,
     CompaniesHouseConnector,
     InsolvencyConnector,

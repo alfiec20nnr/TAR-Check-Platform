@@ -28,22 +28,41 @@ ADVERSE_TERMS = [
     "tax evasion", "convicted", "conviction", "charged", "arrested",
     "investigation", "lawsuit", "tribunal", "misconduct", "scandal",
     "allegations", "banned", "disqualified", "fined", "penalty",
+    # Deceptive conduct and personal misconduct terms:
+    "liar", "lied", "lying", "deceit", "deceiv", "deception",
+    "manipulat", "scam", "exploit", "abuse", "victim",
+    "false claim", "fake",
 ]
 
 # The OR-query sent to the provider alongside the plain name query — the
 # standard adverse-media screening query.
 ADVERSE_QUERY_TERMS = (
     'fraud OR corruption OR "money laundering" OR convicted OR lawsuit '
-    "OR scandal OR investigation OR misconduct OR fined"
+    "OR scandal OR investigation OR misconduct OR fined "
+    'OR liar OR deception OR scam OR abuse OR "false claim"'
 )
+
+# Personal-conduct terms used by the social-media connector on top of the
+# financial-crime vocabulary above. Stems ("extremis", "misogyn") match all
+# their inflections via substring comparison.
+CONDUCT_TERMS = [
+    "racist", "racism", "hate speech", "harassment", "abusive", "threat",
+    "violence", "violent", "assault", "extremis", "slur", "misogyn",
+    "homophob", "offensive", "bullying", "doxx", "drugs",
+]
 
 
 def mentions_subject(subject_name: str, text: str) -> bool:
     return fuzz.token_set_ratio(subject_name.lower(), text.lower()) >= MENTION_THRESHOLD
 
 
-def categorise(text: str) -> str:
+def categorise(
+    text: str,
+    default: str = Category.WEB,
+    extra_terms: list[str] | None = None,
+) -> str:
     lowered = text.lower()
-    if any(term in lowered for term in ADVERSE_TERMS):
+    terms = ADVERSE_TERMS if extra_terms is None else ADVERSE_TERMS + extra_terms
+    if any(term in lowered for term in terms):
         return Category.ADVERSE_MEDIA
-    return Category.WEB
+    return default

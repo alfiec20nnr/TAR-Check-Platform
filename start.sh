@@ -9,6 +9,13 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# Already running? Open its browser tab instead of failing on a busy port.
+if curl -s -o /dev/null --max-time 2 http://127.0.0.1:8000/health 2>/dev/null; then
+    echo "The platform is already running - opening it in your browser..."
+    open http://localhost:8000 2>/dev/null || xdg-open http://localhost:8000 2>/dev/null || true
+    exit 0
+fi
+
 if ! command -v python3 >/dev/null; then
     echo "Python was not found. Install Python 3.11+ and re-run." >&2
     exit 1
@@ -48,19 +55,24 @@ if [ ! -x "$PY" ]; then
     echo "[2/4] Creating Python environment (first run only)..."
     python3 -m venv "$VENV"
 fi
-echo "[2/4] Installing/updating dependencies..."
-"$PY" -m pip install -q -r requirements.txt
-# Catch interrupted or half-finished installs that pip alone does not notice.
-if ! "$PY" -c "import aiosqlite, fastapi, uvicorn, alembic" >/dev/null 2>&1; then
-    echo "Environment verification failed - rebuilding fresh..."
-    rm -rf "$VENV"
-    python3 -m venv "$VENV"
+# Skip the slow pip run entirely when requirements.txt has not changed since
+# the last successful install (the stamp is a copy taken on success).
+STAMP="$VENV/requirements.stamp"
+if cmp -s requirements.txt "$STAMP" 2>/dev/null; then
+    echo "[2/4] Python environment ready."
+else
+    echo "[2/4] Installing/updating dependencies..."
     "$PY" -m pip install -q -r requirements.txt
+    # Catch interrupted or half-finished installs that pip alone does not notice.
+    if ! "$PY" -c "import aiosqlite, fastapi, uvicorn, alembic" >/dev/null 2>&1; then
+        echo "Environment verification failed - rebuilding fresh..."
+        rm -rf "$VENV"
+        python3 -m venv "$VENV"
+        "$PY" -m pip install -q -r requirements.txt
+        "$PY" -c "import aiosqlite, fastapi, uvicorn, alembic"
+    fi
+    cp requirements.txt "$STAMP"
 fi
-
-# Encryption key: generated on first run so personal data is encrypted at
-# rest. An existing key in .env is never overwritten.
-"$PY" -m app.ensure_key
 
 # Single-process mode: SQLite database, pipeline runs in-process. All other
 # settings (API keys etc.) come from the .env file at the project root.
@@ -69,9 +81,8 @@ export INLINE_WORKER=true
 export AUTO_SHUTDOWN_AFTER_SECONDS=90
 export OPEN_BROWSER_URL="http://localhost:8000"
 
-echo "[3/4] Preparing the database..."
-"$PY" -m alembic upgrade head
-"$PY" -m app.seed
-
-echo "[4/4] Starting the platform at http://localhost:8000 (Ctrl+C to stop)..."
-exec "$PY" -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+echo "[3/4] Preparing the database and starting the platform at"
+echo "      http://localhost:8000 (Ctrl+C to stop)..."
+# One interpreter does everything - encryption key, database migrations,
+# connector seeding, then the web server (see backend/app/launch.py).
+exec "$PY" -m app.launch

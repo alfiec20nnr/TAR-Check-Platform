@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     google_cse_id: str = ""
     newsapi_key: str = ""
     brave_api_key: str = ""
+    # Social media screening — platforms searched via the Brave API with
+    # site-restricted queries (comma-separated hostnames). Reuses BRAVE_API_KEY.
+    social_media_sites: str = (
+        "x.com,twitter.com,facebook.com,instagram.com,tiktok.com,reddit.com,youtube.com"
+    )
     companies_house_api_key: str = ""
     fca_api_email: str = ""
     fca_api_key: str = ""

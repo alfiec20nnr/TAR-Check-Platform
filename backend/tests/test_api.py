@@ -142,6 +142,7 @@ async def test_sources_registry(client):
     assert names == {
         "brave_search",
         "google_search",
+        "social_media",
         "news_api",
         "companies_house",
         "insolvency_register",

@@ -54,6 +54,7 @@ class Category:
     ADVERSE_MEDIA = "adverse_media"
     DIRECTORSHIP = "directorship"
     WEB = "web"
+    SOCIAL_MEDIA = "social_media"
     DRIVING_LICENCE = "driving_licence"  # informational verification result
     DRIVING_LICENCE_ISSUE = "driving_licence_issue"  # revoked/expired/not found
     DRIVING_ENDORSEMENT = "driving_endorsement"

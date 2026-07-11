@@ -32,6 +32,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   adverse_media: "Adverse media",
   directorship: "Directorship",
   web: "Web",
+  social_media: "Social media",
   driving_licence: "Driving licence",
   driving_licence_issue: "Licence issue",
   driving_endorsement: "Endorsement",

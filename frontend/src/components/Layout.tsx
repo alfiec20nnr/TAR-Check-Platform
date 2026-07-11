@@ -20,6 +20,7 @@ import { Link as RouterLink, Outlet, useLocation } from "react-router-dom";
 
 import { useHealth } from "../api/hooks";
 import { useColorMode } from "../theme";
+import WelcomeDialog from "./WelcomeDialog";
 
 /** Lets the single-process (no-Docker) server stop itself when the last tab
  *  closes: announce open/close, and heartbeat while the tab is alive. All
@@ -65,6 +66,7 @@ export default function Layout() {
 
   return (
     <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <WelcomeDialog />
       <AppBar position="sticky" elevation={1} color="default">
         <Toolbar sx={{ gap: 2 }}>
           <ShieldIcon color="primary" />

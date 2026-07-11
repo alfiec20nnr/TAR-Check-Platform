@@ -19,14 +19,14 @@ web interface ships pre-built, so Node.js is *not* required.
 
 1. Get the project: on GitHub choose **Code → Download ZIP**, right-click the
    ZIP → **Extract All**, and open the extracted folder (or `git clone` it).
-2. Double-click **`start-hidden.vbs`** (Windows). The very first run shows a
-   setup window and takes a few minutes — it downloads Python packages, so it
-   needs an internet connection once. Every run after that starts in seconds,
-   completely silently. It's an ideal target for a desktop shortcut
-   (right-click → Send to → Desktop). Prefer a visible window? Double-click
-   `start.bat` instead (macOS/Linux: run `./start.sh`).
+2. Double-click **`start.bat`** (Windows; macOS/Linux: run `./start.sh`). The
+   very first run takes a few minutes — it downloads Python packages, so it
+   needs an internet connection once. Every run after that starts in a
+   couple of seconds. It's an ideal target for a desktop shortcut
+   (right-click → Send to → Desktop).
 3. A browser tab opens at http://localhost:8000 by itself once the platform
-   is ready.
+   is ready. Double-clicking `start.bat` again while the platform is already
+   running simply reopens that tab.
 
 > **Windows security prompts:** files downloaded from the internet may
 > trigger a one-time "publisher could not be verified" / SmartScreen warning —
@@ -35,9 +35,7 @@ web interface ships pre-built, so Node.js is *not* required.
 **Stopping is automatic**: close the platform's browser tab and the server
 shuts itself down within about half a minute (it always lets any in-progress
 search finish first; if the browser crashes, a 90-second no-activity fallback
-kicks in). Closing the `start.bat` window also stops it. If a silent start
-ever misbehaves, check `last-run.log` in the project folder or run `start.bat`
-directly to watch the output.
+kicks in). Closing the `start.bat` window also stops it.
 
 On first start the platform creates `.env` from `.env.example` and generates
 an `ENCRYPTION_KEY` in it, so personal data is encrypted at rest out of the
@@ -98,6 +96,7 @@ Set `MOCK_CONNECTORS=false` and provide keys in `.env`:
 | Connector | Credentials | Where to get them |
 |---|---|---|
 | Brave Web Search | `BRAVE_API_KEY` | [api-dashboard.search.brave.com](https://api-dashboard.search.brave.com/register) — recommended web source, free tier |
+| Social Media | `BRAVE_API_KEY` (same key) | Public posts/profiles on X/Twitter, Facebook, Instagram, TikTok, Reddit, YouTube via Brave's index — platforms configurable with `SOCIAL_MEDIA_SITES` |
 | Google Search | `GOOGLE_API_KEY`, `GOOGLE_CSE_ID` | ⚠ Closed to new customers since Jan 2026 — grandfathered keys only |
 | News API | `NEWSAPI_KEY` | newsapi.org |
 | UK Companies House | `COMPANIES_HOUSE_API_KEY` | developer.company-information.service.gov.uk |
@@ -191,7 +190,7 @@ All ceilings are tunable in `backend/config/matching_weights.yaml`.
 
 ```
 backend/            FastAPI modular monolith + background worker
-  app/connectors/     connector framework + 6 UK sources
+  app/connectors/     connector framework + data-source connectors
   app/services/       identity matching, risk scoring, AI summary, reports, pipeline
   app/api/            REST endpoints
   config/             tunable YAML weightings

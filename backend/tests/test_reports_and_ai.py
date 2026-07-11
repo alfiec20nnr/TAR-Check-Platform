@@ -2,6 +2,8 @@
 
 import re
 
+import pytest
+
 from app.config import Settings
 from app.connectors.base import Category, Finding, SearchSubject
 from app.services import report_generator
@@ -94,3 +96,23 @@ def test_fallback_summary_clean_subject():
     content = fallback_summary(SUBJECT, [])
     assert "No adverse findings" in content["executive_summary"]
     assert content["key_concerns"] == []
+
+
+def test_render_pdf_produces_pdf_bytes():
+    """PDF rendering works via WeasyPrint or the headless-browser fallback
+    (Edge on Windows, Chrome/Chromium on CI runners)."""
+    if (
+        report_generator._get_weasyprint() is None
+        and report_generator._find_chromium() is None
+    ):
+        pytest.skip("no PDF engine available in this environment")
+    html = report_generator.render_html(sample_report())
+    pdf = report_generator.render_pdf(html)
+    assert pdf[:5] == b"%PDF-"
+
+
+def test_render_pdf_clear_error_without_any_engine(monkeypatch):
+    monkeypatch.setattr(report_generator, "_get_weasyprint", lambda: None)
+    monkeypatch.setattr(report_generator, "_find_chromium", lambda: None)
+    with pytest.raises(RuntimeError, match="HTML or JSON"):
+        report_generator.render_pdf("<html></html>")

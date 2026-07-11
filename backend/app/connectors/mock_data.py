@@ -72,6 +72,48 @@ def web_mock(subject: SearchSubject, source: str = "google_search") -> list[Find
     return findings
 
 
+def social_mock(subject: SearchSubject) -> list[Finding]:
+    # Like the live connector, social results are unstructured mentions —
+    # account attribution is never treated as a verified identity match.
+    name = subject.full_name
+    p = profile_for(subject)
+    findings = [
+        Finding(
+            source="social_media",
+            category=Category.SOCIAL_MEDIA,
+            title=f"{name} (@example) — X profile",
+            description=f"Public X (Twitter) profile matching the name {name}.",
+            url="https://x.com/example",
+            raw={"mock": True, "platform": "X (Twitter)"},
+        ),
+        Finding(
+            source="social_media",
+            category=Category.SOCIAL_MEDIA,
+            title=f"{name} — Instagram",
+            description=f"Public Instagram account matching the name {name}.",
+            url="https://www.instagram.com/example/",
+            raw={"mock": True, "platform": "Instagram"},
+        ),
+    ]
+    if p >= MEDIA:
+        findings.append(
+            Finding(
+                source="social_media",
+                category=Category.ADVERSE_MEDIA,
+                title=f"Reddit thread discusses abusive posts attributed to {name}",
+                description=(
+                    f"A public Reddit thread alleges that an account attributed to "
+                    f"{name} published abusive and threatening posts. The account "
+                    "attribution is unverified."
+                ),
+                url="https://www.reddit.com/r/example/comments/thread",
+                date="2024-07-22",
+                raw={"mock": True, "platform": "Reddit"},
+            )
+        )
+    return findings
+
+
 def news_mock(subject: SearchSubject) -> list[Finding]:
     name = subject.full_name
     p = profile_for(subject)
