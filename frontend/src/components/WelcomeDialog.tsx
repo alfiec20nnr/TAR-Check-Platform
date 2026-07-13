@@ -14,11 +14,15 @@ import {
 } from "@mui/material";
 import { useState } from "react";
 
+import { useHealth } from "../api/hooks";
+
 /** Shown once per browser session: the user must acknowledge what the
  *  platform is, how to use it, and how to read its output before searching. */
 const STORAGE_KEY = "aip-welcome-acknowledged";
 
 export default function WelcomeDialog() {
+  const { data: health } = useHealth();
+  const appName = health?.app_name ?? "Adverse Intelligence";
   const [open, setOpen] = useState(
     () => sessionStorage.getItem(STORAGE_KEY) !== "true",
   );
@@ -38,7 +42,7 @@ export default function WelcomeDialog() {
     >
       <DialogTitle id="welcome-dialog-title" sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         <InfoOutlinedIcon color="primary" />
-        Welcome to the Adverse Intelligence Platform
+        Welcome to {appName}
       </DialogTitle>
       <DialogContent dividers>
         <Typography variant="body2" paragraph>

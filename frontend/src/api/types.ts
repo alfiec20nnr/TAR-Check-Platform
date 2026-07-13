@@ -69,6 +69,8 @@ export interface HealthInfo {
   status: string;
   version: string;
   mock_connectors: boolean;
+  /** Configurable display name (APP_NAME in .env). */
+  app_name: string;
 }
 
 export interface DashboardStats {

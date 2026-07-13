@@ -303,6 +303,7 @@ async def health() -> dict:
         "status": "ok",
         "version": __version__,
         "mock_connectors": settings.mock_connectors,
+        "app_name": settings.app_name,
     }
 
 

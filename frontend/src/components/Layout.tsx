@@ -15,7 +15,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link as RouterLink, Outlet, useLocation } from "react-router-dom";
 
 import { useHealth } from "../api/hooks";
@@ -62,18 +62,37 @@ export default function Layout() {
   const { mode, toggle } = useColorMode();
   const location = useLocation();
   const { data: health } = useHealth();
+  const [logoOk, setLogoOk] = useState(true);
   useSessionPresence();
+
+  // Configurable display name (APP_NAME in .env, surfaced via /health).
+  const appName = health?.app_name ?? "Adverse Intelligence";
+
+  // Keep the browser tab title in sync with the configured name.
+  useEffect(() => {
+    document.title = appName;
+  }, [appName]);
 
   return (
     <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <WelcomeDialog />
       <AppBar position="sticky" elevation={1} color="default">
         <Toolbar sx={{ gap: 2 }}>
-          <ShieldIcon color="primary" />
+          {logoOk ? (
+            <Box
+              component="img"
+              src="/logo.png"
+              alt={`${appName} logo`}
+              onError={() => setLogoOk(false)}
+              sx={{ height: 32, width: "auto", maxWidth: 160, borderRadius: 1, display: "block" }}
+            />
+          ) : (
+            <ShieldIcon color="primary" />
+          )}
           <Typography variant="h6" component={RouterLink} to="/" sx={{
             color: "inherit", textDecoration: "none", flexGrow: { xs: 1, sm: 0 }, mr: 2,
           }}>
-            Adverse Intelligence
+            {appName}
           </Typography>
           <Box sx={{ display: "flex", gap: 1, flexGrow: 1 }}>
             {NAV.map((item) => (
@@ -109,7 +128,7 @@ export default function Layout() {
       </Container>
       <Box component="footer" sx={{ py: 2, textAlign: "center", opacity: 0.6 }}>
         <Typography variant="caption">
-          Adverse Intelligence Platform (MVP) — for legitimate business due diligence only.
+          {appName} (MVP) — for legitimate business due diligence only.
         </Typography>
       </Box>
     </Box>

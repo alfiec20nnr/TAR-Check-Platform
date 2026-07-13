@@ -427,6 +427,104 @@ async def test_social_media_categorises_and_filters(monkeypatch):
     assert by_url["https://x.com/testperson"].raw["platform"] == "X (Twitter)"
 
 
+# Mirrors the live response shape of the Gazette notice-feed API (Atom-derived
+# JSON), captured 2026-07-11.
+_GAZETTE_JSON = {
+    "f:total": "3",
+    "entry": [
+        {
+            "id": "https://www.thegazette.co.uk/id/notice/L-1234-2021",
+            "f:notice-code": "2502",
+            "title": "Bankruptcy Orders",
+            "link": [
+                {"@href": "https://www.thegazette.co.uk/id/notice/L-1234-2021",
+                 "@rel": "self"},
+                {"@href": "https://www.thegazette.co.uk/notice/L-1234-2021"},
+                {"@href": "https://www.thegazette.co.uk/notice/L-1234-2021/data.ttl",
+                 "@rel": "alternate", "@title": "TURTLE", "@type": "text/turtle"},
+            ],
+            "published": "2021-08-20T00:00:00",
+            "category": {"@term": "Bankruptcy Orders"},
+            "content": (
+                '<div><p><em class="highlight">TEST PERSON</em> of 1 Example '
+                "Street, London. Birth details: 2 March 1975. A bankruptcy "
+                "order was made…</p></div>"
+            ),
+        },
+        {
+            "id": "https://www.thegazette.co.uk/id/notice/L-9999-2020",
+            "f:notice-code": "2506",
+            "title": "Amendment of Title of Proceedings",
+            "link": [{"@href": "https://www.thegazette.co.uk/id/notice/L-9999-2020",
+                      "@rel": "self"}],
+            "published": "2020-01-01T00:00:00",
+            "category": {"@term": "Amendment of Title of Proceedings"},
+            "content": "<div><p>SOMEBODY ELSE ENTIRELY of 2 Other Road.</p></div>",
+        },
+    ],
+}
+
+
+@respx.mock
+async def test_insolvency_gazette_default_parses_and_screens():
+    """Without a licensed provider the connector queries The Gazette (no key),
+    keeps only notices naming the subject, and links the human notice page."""
+    from app.connectors.insolvency import GAZETTE_API_URL, InsolvencyConnector
+
+    route = respx.get(GAZETTE_API_URL).mock(
+        return_value=httpx.Response(200, json=_GAZETTE_JSON)
+    )
+    connector = InsolvencyConnector(real_settings(insolvency_api_url=""))
+    result = await connector.run(SUBJECT)
+    assert result.status == ConnectorStatus.SUCCESS
+
+    params = route.calls[0].request.url.params
+    assert params["categorycode"] == "25"
+    assert params["text"] == "Test Person"
+
+    assert len(result.findings) == 1
+    finding = result.findings[0]
+    assert finding.category == Category.INSOLVENCY
+    assert finding.url == "https://www.thegazette.co.uk/notice/L-1234-2021"
+    assert finding.date == "2021-08-20"
+    assert "bankruptcy order" in (finding.description or "")
+    assert "<" not in (finding.description or "")  # HTML stripped
+    # Gazette search results carry no structured subject name — treated as an
+    # unstructured mention so identity matching caps confidence honestly.
+    assert finding.subject_name is None
+    # The standardised "Birth details:" line is surfaced for identity matching.
+    assert finding.date_of_birth == "1975-03-02"
+    assert finding.raw["notice_code"] == "2502"
+
+
+@respx.mock
+async def test_insolvency_licensed_provider_path_still_works():
+    from app.connectors.insolvency import InsolvencyConnector
+
+    route = respx.get("https://provider.example.com/insolvency").mock(
+        return_value=httpx.Response(
+            200,
+            json={"records": [
+                {"title": "Bankruptcy order — Test Person", "name": "Test Person",
+                 "order_type": "bankruptcy", "date": "2021-08-20",
+                 "url": "https://provider.example.com/r/1"},
+            ]},
+        )
+    )
+    connector = InsolvencyConnector(
+        real_settings(
+            insolvency_api_url="https://provider.example.com/insolvency",
+            insolvency_api_key="secret",
+        )
+    )
+    result = await connector.run(SUBJECT)
+    assert result.status == ConnectorStatus.SUCCESS
+    assert route.calls[0].request.headers["Authorization"] == "Bearer secret"
+    assert len(result.findings) == 1
+    assert result.findings[0].subject_name == "Test Person"
+    assert result.findings[0].category == Category.INSOLVENCY
+
+
 @pytest.mark.parametrize("cls", CONNECTOR_CLASSES)
 async def test_every_connector_declares_metadata(cls):
     assert cls.name != "base"

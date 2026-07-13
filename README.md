@@ -102,7 +102,7 @@ Set `MOCK_CONNECTORS=false` and provide keys in `.env`:
 | UK Companies House | `COMPANIES_HOUSE_API_KEY` | developer.company-information.service.gov.uk |
 | FCA register | `FCA_API_EMAIL`, `FCA_API_KEY` | register.fca.org.uk/Developer |
 | UK Sanctions List | **none — works out of the box** | Live FCDO XML feed (default URL); a licensed provider JSON endpoint also works |
-| Insolvency Register | `INSOLVENCY_API_URL`, `INSOLVENCY_API_KEY` | licensed data provider of your choice |
+| Insolvency Register | **none — works out of the box** | Bankruptcy/personal-insolvency notices via The Gazette's official public data API; set `INSOLVENCY_API_URL`/`INSOLVENCY_API_KEY` for a licensed provider that adds IVAs and Debt Relief Orders |
 | DVLA Driving Licence (ADD) | `DVLA_USERNAME`, `DVLA_PASSWORD`, `DVLA_API_KEY` (+ `DVLA_API_BASE_URL` for prod) | Commercial agreement with DVLA ([developer portal](https://developer-portal.driver-vehicle-licensing.api.gov.uk/)); UAT is the default environment |
 
 Connectors without credentials are skipped gracefully; the rest still run.
@@ -212,8 +212,9 @@ docker-compose.yml  Postgres + API + worker + nginx web
 - **AI separation** — reports visibly separate verified source records from
   AI-generated summary text; the AI is instructed never to state allegations
   as fact.
-- Respect source terms of service; the insolvency connector expects a licensed
-  provider rather than scraping.
+- Respect source terms of service; no source is scraped. The insolvency
+  connector uses The Gazette's official public data API (Open Government
+  Licence) by default, or a licensed provider endpoint when configured.
 
 ## Phase 2 (out of scope for this MVP)
 
