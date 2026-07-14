@@ -19,6 +19,7 @@ import time
 
 from fastapi import HTTPException, Request, Response, status
 
+from app import licensing
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -108,8 +109,15 @@ def is_authenticated(request: Request) -> bool:
     return bool(token) and verify_session_token(token)
 
 
+def require_activation() -> None:
+    """Reject requests until this machine has a valid activation code."""
+    if not licensing.is_activated():
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Activation required")
+
+
 def require_auth(request: Request) -> None:
     """Router dependency: reject requests without a valid session cookie."""
+    require_activation()
     if not get_settings().auth_password_hash:
         # First launch — nothing to log in with yet; the UI shows the setup
         # form when it sees this detail string.

@@ -46,6 +46,12 @@ def _settings_cache():
 
 
 @pytest.fixture(autouse=True)
+def _activated(monkeypatch):
+    """Run every test as an activated machine; licensing tests override this."""
+    monkeypatch.setattr("app.licensing.is_activated", lambda: True)
+
+
+@pytest.fixture(autouse=True)
 async def _prepare_db():
     """Fresh schema for every test."""
     engine = database.get_engine()

@@ -37,6 +37,7 @@ async def auth_status(request: Request) -> AuthStatus:
 @router.post("/setup", status_code=204)
 async def setup(payload: SetupRequest, response: Response) -> None:
     """First-launch credential creation; persists to `.env` and logs in."""
+    auth.require_activation()
     settings = get_settings()
     if settings.auth_password_hash:
         raise HTTPException(
@@ -65,6 +66,7 @@ async def setup(payload: SetupRequest, response: Response) -> None:
 
 @router.post("/login", status_code=204)
 async def login(payload: LoginRequest, response: Response) -> None:
+    auth.require_activation()
     settings = get_settings()
     if not settings.auth_password_hash:
         raise HTTPException(

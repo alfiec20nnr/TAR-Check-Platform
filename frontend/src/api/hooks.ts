@@ -4,6 +4,7 @@ import { api, fetchHealth } from "./client";
 import type {
   AuthStatus,
   DashboardStats,
+  LicenceStatus,
   HealthInfo,
   PaginatedSearches,
   SearchCreate,
@@ -77,6 +78,25 @@ export function useClearHistory() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["searches"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
+export function useLicenceStatus() {
+  return useQuery({
+    queryKey: ["licence-status"],
+    queryFn: () => api.get<LicenceStatus>("/licence/status"),
+    staleTime: 0,
+    retry: false,
+  });
+}
+
+export function useActivate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { code: string }) => api.post<void>("/licence/activate", payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["licence-status"] });
     },
   });
 }

@@ -29,7 +29,11 @@ web interface ships pre-built, so Node.js is *not* required.
 3. A browser tab opens at http://localhost:8000 by itself once the platform
    is ready. Double-clicking `start.bat` again while the platform is already
    running simply reopens that tab.
-4. The very first time, the platform asks you to **choose a username and
+4. On a machine that hasn't been activated yet, the browser first shows an
+   **activation screen** with this machine's code — send that code to your
+   software provider and paste in the activation code you receive back
+   (one-off per machine).
+5. The very first time, the platform then asks you to **choose a username and
    password** — you'll sign in with these whenever you use it. To change them
    later, run `python -m app.set_password` from the `backend` folder and
    restart.

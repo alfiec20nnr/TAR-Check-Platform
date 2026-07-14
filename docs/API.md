@@ -4,6 +4,20 @@ Base URL: `/api/v1`. Interactive OpenAPI docs are generated automatically at
 `/docs` (Swagger UI) and `/redoc`. Requests are rate-limited per client IP
 (`API_RATE_LIMIT`, default 60/minute).
 
+## Machine activation
+
+The platform only runs on activated machines. Until a valid activation code
+is entered, every endpoint except `/health`, the session beacons, and the
+licence endpoints returns `403 {"detail": "Activation required"}` — including
+login. Activation codes are issued by the software provider for one specific
+machine (Ed25519 signature of the machine code; only the public key ships
+with the app).
+
+```
+GET  /api/v1/licence/status    → { "activated": bool, "machine_code": "ABCD-EFGH-IJKL-MNOP" }
+POST /api/v1/licence/activate  { "code": "<activation code>" }   // 204, or 400 if invalid
+```
+
 ## Authentication
 
 A single username/password protects the whole API (chosen in the UI on first

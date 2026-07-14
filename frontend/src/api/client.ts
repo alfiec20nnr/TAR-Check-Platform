@@ -30,6 +30,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       /* non-JSON error body */
     }
+    // Machine not activated: everything (including login) is locked until an
+    // activation code is entered.
+    if (
+      resp.status === 403 &&
+      detail === "Activation required" &&
+      window.location.pathname !== "/activate"
+    ) {
+      window.location.assign("/activate");
+    }
     throw new ApiError(resp.status, detail);
   }
   if (resp.status === 204) {

@@ -13,13 +13,14 @@ import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 
 import { ApiError } from "../api/client";
-import { useAuthStatus, useHealth, useLogin, useSetup } from "../api/hooks";
+import { useAuthStatus, useHealth, useLicenceStatus, useLogin, useSetup } from "../api/hooks";
 import { useSessionPresence } from "../components/Layout";
 
 /** Login lock screen; on first launch it becomes the credential-setup form. */
 export default function LoginPage() {
   const navigate = useNavigate();
   const { data: health } = useHealth();
+  const { data: licence } = useLicenceStatus();
   const { data: status, isLoading } = useAuthStatus();
   const login = useLogin();
   const setup = useSetup();
@@ -33,6 +34,9 @@ export default function LoginPage() {
   const appName = health?.app_name ?? "Adverse Intelligence";
   const firstRun = status !== undefined && !status.configured;
 
+  if (licence && !licence.activated) {
+    return <Navigate to="/activate" replace />;
+  }
   if (status?.authenticated) {
     return <Navigate to="/" replace />;
   }

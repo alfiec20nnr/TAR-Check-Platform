@@ -73,6 +73,12 @@ export interface HealthInfo {
   app_name: string;
 }
 
+export interface LicenceStatus {
+  activated: boolean;
+  /** Shown to the user so they can request an activation code for this machine. */
+  machine_code: string;
+}
+
 export interface AuthStatus {
   /** False until the first-launch setup has chosen a username/password. */
   configured: boolean;

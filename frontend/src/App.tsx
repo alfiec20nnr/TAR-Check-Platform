@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
 import Layout from "./components/Layout";
+import ActivatePage from "./pages/ActivatePage";
 import DashboardPage from "./pages/DashboardPage";
 import HistoryPage from "./pages/HistoryPage";
 import LoginPage from "./pages/LoginPage";
@@ -19,6 +20,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <Routes>
+            <Route path="/activate" element={<ActivatePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route element={<Layout />}>
               <Route path="/" element={<DashboardPage />} />

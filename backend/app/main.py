@@ -24,9 +24,9 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app import __version__
+from app import __version__, licensing
 from app.api.routes import auth as auth_routes
-from app.api.routes import dashboard, reports, searches
+from app.api.routes import dashboard, licence, reports, searches
 from app.auth import require_auth
 from app.config import get_settings
 
@@ -265,6 +265,17 @@ async def _run_single_process_housekeeping() -> None:
 
 
 @app.on_event("startup")
+async def _log_activation_state() -> None:
+    if not licensing.is_activated():
+        logging.getLogger(__name__).warning(
+            "This machine is not activated. Machine code: %s — the browser "
+            "will show the activation screen; enter the activation code "
+            "issued for this machine.",
+            licensing.machine_code(),
+        )
+
+
+@app.on_event("startup")
 async def _open_browser_when_ready() -> None:
     """Open the UI once the server is actually reachable (start scripts set
     OPEN_BROWSER_URL). Polling first avoids the browser racing ahead of the
@@ -294,8 +305,10 @@ async def _open_browser_when_ready() -> None:
     asyncio.get_running_loop().create_task(_poll_then_open())
 
 
-# Everything except login itself, /health, and the session-presence beacons
-# requires a valid session cookie (single-user lock screen — see app.auth).
+# Everything except activation, login itself, /health, and the
+# session-presence beacons requires a valid session cookie on an activated
+# machine (see app.licensing and app.auth).
+app.include_router(licence.router, prefix="/api/v1")
 app.include_router(auth_routes.router, prefix="/api/v1")
 app.include_router(searches.router, prefix="/api/v1", dependencies=[Depends(require_auth)])
 app.include_router(reports.router, prefix="/api/v1", dependencies=[Depends(require_auth)])
