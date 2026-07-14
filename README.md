@@ -9,7 +9,9 @@ generates a professional report (PDF / HTML / JSON).
 Intended for legitimate business due diligence, compliance, KYC/AML support,
 supplier vetting, recruitment screening (where legally permitted), and
 reputational risk assessment. Runs locally or inside a single trusted
-organisation network — **no accounts, no authentication, not multi-tenant**.
+organisation network — protected by a **single username/password** chosen on
+first launch (a lock screen for the machine; no per-user accounts, not
+multi-tenant).
 
 ## Easiest start (no Docker) — recommended for non-technical users
 
@@ -27,6 +29,10 @@ web interface ships pre-built, so Node.js is *not* required.
 3. A browser tab opens at http://localhost:8000 by itself once the platform
    is ready. Double-clicking `start.bat` again while the platform is already
    running simply reopens that tab.
+4. The very first time, the platform asks you to **choose a username and
+   password** — you'll sign in with these whenever you use it. To change them
+   later, run `python -m app.set_password` from the `backend` folder and
+   restart.
 
 > **Windows security prompts:** files downloaded from the internet may
 > trigger a one-time "publisher could not be verified" / SmartScreen warning —
@@ -219,6 +225,7 @@ docker-compose.yml  Postgres + API + worker + nginx web
 ## Phase 2 (out of scope for this MVP)
 
 Continuous monitoring, alerts/notifications, case management, additional
-connectors (PEP data, non-UK jurisdictions), and authentication/multi-tenancy.
+connectors (PEP data, non-UK jurisdictions), and multi-user
+accounts/multi-tenancy (the MVP has a single shared login).
 The modular-monolith and connector-registry design deliberately leaves room
 for all of these.

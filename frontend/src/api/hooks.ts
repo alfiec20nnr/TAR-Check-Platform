@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, fetchHealth } from "./client";
 import type {
+  AuthStatus,
   DashboardStats,
   HealthInfo,
   PaginatedSearches,
@@ -76,6 +77,39 @@ export function useClearHistory() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["searches"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
+export function useAuthStatus() {
+  return useQuery({
+    queryKey: ["auth-status"],
+    queryFn: () => api.get<AuthStatus>("/auth/status"),
+    staleTime: 0,
+    retry: false,
+  });
+}
+
+export function useLogin() {
+  return useMutation({
+    mutationFn: (payload: { username: string; password: string }) =>
+      api.post<void>("/auth/login", payload),
+  });
+}
+
+/** First-launch credential creation; the server logs the user straight in. */
+export function useSetup() {
+  return useMutation({
+    mutationFn: (payload: { username: string; password: string }) =>
+      api.post<void>("/auth/setup", payload),
+  });
+}
+
+export function useLogout() {
+  return useMutation({
+    mutationFn: () => api.post<void>("/auth/logout", {}),
+    onSuccess: () => {
+      window.location.assign("/login");
     },
   });
 }

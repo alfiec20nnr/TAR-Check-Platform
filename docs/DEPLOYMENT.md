@@ -26,6 +26,8 @@ Minimum production edits in `.env`:
 |---|---|
 | `POSTGRES_PASSWORD` | Set a strong password |
 | `ENCRYPTION_KEY` | Generate: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
+| `AUTH_SECRET` | Generate: `python -c "import secrets; print(secrets.token_urlsafe(32))"` (signs login cookies) |
+| `AUTH_USERNAME` / `AUTH_PASSWORD_HASH` | Run `python -m app.set_password` from `backend/` (writes both). If left empty, the UI asks on first launch — but in Docker that choice only lasts until the container is recreated, so set them here for anything long-lived |
 | `MOCK_CONNECTORS` | `false` for real sources |
 | Connector keys | See README table |
 | `ANTHROPIC_API_KEY` | For AI summaries (optional — falls back to template) |

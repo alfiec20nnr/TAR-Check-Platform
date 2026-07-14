@@ -1,9 +1,26 @@
 # API Documentation
 
 Base URL: `/api/v1`. Interactive OpenAPI docs are generated automatically at
-`/docs` (Swagger UI) and `/redoc`. There is no authentication (single trusted
-environment); requests are rate-limited per client IP (`API_RATE_LIMIT`,
-default 60/minute).
+`/docs` (Swagger UI) and `/redoc`. Requests are rate-limited per client IP
+(`API_RATE_LIMIT`, default 60/minute).
+
+## Authentication
+
+A single username/password protects the whole API (chosen in the UI on first
+launch; change it with `python -m app.set_password` from `backend/`). All
+endpoints except `/health` and the auth endpoints below require the session
+cookie that login sets.
+
+```
+GET  /api/v1/auth/status   → { "configured": bool, "authenticated": bool }
+POST /api/v1/auth/setup    { "username", "password" }   // first launch only, 409 afterwards
+POST /api/v1/auth/login    { "username", "password" }   // 204 + aip_session cookie, 401 otherwise
+POST /api/v1/auth/logout   // clears the session cookie
+```
+
+Sessions are signed HTTP-only cookies valid for `AUTH_SESSION_HOURS`
+(default 12). API clients (curl, scripts) should POST to `/auth/login` first
+and reuse the returned cookie.
 
 ## Submit a search
 

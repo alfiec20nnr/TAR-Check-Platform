@@ -15,7 +15,7 @@ The platform must be **modular, maintainable, and secure**, and is designed to r
 This build targets a first working version for a small business. The following principles apply throughout:
 
 - **Individuals only.** The platform searches for people. There is no company search, company profile, or company-centric functionality.
-- **No authentication or user accounts.** The application runs locally or inside a trusted organisation network. There is no login, JWT, OAuth, MFA, roles, permissions, or user management anywhere in the system.
+- **Single-user login only.** The application runs locally or inside a trusted organisation network and is protected by one username/password pair (a lock screen for the machine, configured on first launch and stored hashed in `.env`). There are no user accounts, JWT, OAuth, MFA, roles, permissions, or user management anywhere in the system.
 - **Modular monolith.** A single deployable application composed of clear internal modules, not a set of microservices.
 - **Lean infrastructure.** Docker Compose, a single PostgreSQL database, and background workers only where they add real value.
 - **Extensible by design.** The connector framework must remain modular so new data sources can be added later without touching core logic.
@@ -57,7 +57,7 @@ Each search produces and stores a single report. There is no case management in 
 - Nginx reverse proxy
 - GitHub Actions CI/CD
 
-There is **no** authentication stack, no Elasticsearch/OpenSearch, no Kubernetes, and no cloud-provider-specific deployment (AWS/Azure) in the MVP. The application is designed to run via Docker Compose on a local machine or a single host.
+There is **no** multi-user authentication stack (only the single-user login described above), no Elasticsearch/OpenSearch, no Kubernetes, and no cloud-provider-specific deployment (AWS/Azure) in the MVP. The application is designed to run via Docker Compose on a local machine or a single host.
 
 ---
 
@@ -286,8 +286,9 @@ There are no Users, Roles, Permissions, Cases, Monitoring Jobs, or Notifications
 
 ## Security
 
-The application runs locally or within a trusted organisation network, so authentication is out of scope. Sensible application-level protections still apply because the system processes personal data:
+The application runs locally or within a trusted organisation network. Access is protected by a single username/password (chosen on first launch, stored as a PBKDF2 hash in `.env`, session held in a signed HTTP-only cookie). Sensible application-level protections also apply because the system processes personal data:
 
+- Single-user login (lock screen for the machine; no accounts or roles)
 - HTTPS in transit
 - Input validation
 - Rate limiting (API and outbound connectors)
@@ -298,7 +299,7 @@ The application runs locally or within a trusted organisation network, so authen
 - Secrets management (API keys for connectors and the LLM)
 - Audit logging
 
-There is no JWT, role-based access, session management, or account lockout, as there are no accounts.
+There is no JWT, role-based access, or account lockout, as there are no per-user accounts — just the one shared login above.
 
 ---
 

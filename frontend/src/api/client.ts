@@ -13,6 +13,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json" },
     ...init,
   });
+  // Session missing or expired: send the user to the login screen. Auth
+  // endpoints are exempt so the login page can handle its own errors.
+  if (
+    resp.status === 401 &&
+    !path.startsWith("/auth/") &&
+    window.location.pathname !== "/login"
+  ) {
+    window.location.assign("/login");
+  }
   if (!resp.ok) {
     let detail = resp.statusText;
     try {

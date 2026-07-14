@@ -73,6 +73,12 @@ export interface HealthInfo {
   app_name: string;
 }
 
+export interface AuthStatus {
+  /** False until the first-launch setup has chosen a username/password. */
+  configured: boolean;
+  authenticated: boolean;
+}
+
 export interface DashboardStats {
   total_searches: number;
   running_searches: number;

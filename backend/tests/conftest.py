@@ -7,6 +7,8 @@ database, mock connectors, inline worker, no AI key (template fallback).
 import os
 import tempfile
 
+TEST_PASSWORD = "test-password"
+
 _TMP_DIR = tempfile.mkdtemp(prefix="aip-test-")
 os.environ.update(
     {
@@ -17,8 +19,16 @@ os.environ.update(
         "ENCRYPTION_KEY": "",
         "API_RATE_LIMIT": "1000/minute",
         "CORS_ORIGINS": "http://testserver",
+        "AUTH_USERNAME": "admin",
+        "AUTH_SECRET": "test-auth-secret",
     }
 )
+
+from app.auth import hash_password  # noqa: E402
+
+# Low iteration count keeps the per-test login fast; the verify path reads
+# the count from the stored hash, so production strength is unaffected.
+os.environ["AUTH_PASSWORD_HASH"] = hash_password(TEST_PASSWORD, iterations=1000)
 
 import pytest  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
@@ -47,6 +57,22 @@ async def _prepare_db():
 
 @pytest.fixture
 async def client():
+    """Logged-in client — the session cookie persists on the AsyncClient."""
+    from app.main import app
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        resp = await ac.post(
+            "/api/v1/auth/login",
+            json={"username": "admin", "password": TEST_PASSWORD},
+        )
+        assert resp.status_code == 204, "test login failed"
+        yield ac
+
+
+@pytest.fixture
+async def anon_client():
+    """Client without a session cookie, for testing the auth boundary."""
     from app.main import app
 
     transport = ASGITransport(app=app)

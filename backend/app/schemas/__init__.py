@@ -1,3 +1,4 @@
+from app.schemas.auth import AuthStatus, LoginRequest, SetupRequest
 from app.schemas.search import (
     AuditEntryOut,
     DashboardStats,
@@ -11,6 +12,9 @@ from app.schemas.search import (
 
 __all__ = [
     "AuditEntryOut",
+    "AuthStatus",
+    "LoginRequest",
+    "SetupRequest",
     "DashboardStats",
     "PaginatedSearches",
     "SearchCreate",

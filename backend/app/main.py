@@ -1,9 +1,11 @@
 """FastAPI application entry point.
 
-Runs locally / inside a trusted network — no authentication by design (MVP).
-Application-level protections that do apply: input validation (Pydantic),
-rate limiting, CORS, security headers, parameterised queries (SQLAlchemy),
-and encryption-at-rest for personal data.
+Runs locally / inside a trusted network. Access is protected by a single
+username/password (a lock screen for the machine — see app.auth); there are
+no user accounts, roles, or multi-tenancy. Other application-level
+protections: input validation (Pydantic), rate limiting, CORS, security
+headers, parameterised queries (SQLAlchemy), and encryption-at-rest for
+personal data.
 """
 
 import asyncio
@@ -13,7 +15,7 @@ import signal
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -23,7 +25,9 @@ from slowapi.util import get_remote_address
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import __version__
+from app.api.routes import auth as auth_routes
 from app.api.routes import dashboard, reports, searches
+from app.auth import require_auth
 from app.config import get_settings
 
 logging.basicConfig(
@@ -290,9 +294,12 @@ async def _open_browser_when_ready() -> None:
     asyncio.get_running_loop().create_task(_poll_then_open())
 
 
-app.include_router(searches.router, prefix="/api/v1")
-app.include_router(reports.router, prefix="/api/v1")
-app.include_router(dashboard.router, prefix="/api/v1")
+# Everything except login itself, /health, and the session-presence beacons
+# requires a valid session cookie (single-user lock screen — see app.auth).
+app.include_router(auth_routes.router, prefix="/api/v1")
+app.include_router(searches.router, prefix="/api/v1", dependencies=[Depends(require_auth)])
+app.include_router(reports.router, prefix="/api/v1", dependencies=[Depends(require_auth)])
+app.include_router(dashboard.router, prefix="/api/v1", dependencies=[Depends(require_auth)])
 
 
 @app.get("/health", tags=["health"])

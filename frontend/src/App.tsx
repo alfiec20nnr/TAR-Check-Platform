@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import DashboardPage from "./pages/DashboardPage";
 import HistoryPage from "./pages/HistoryPage";
+import LoginPage from "./pages/LoginPage";
 import NewSearchPage from "./pages/NewSearchPage";
 import SearchDetailPage from "./pages/SearchDetailPage";
 import { AppThemeProvider } from "./theme";
@@ -18,6 +19,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <Routes>
+            <Route path="/login" element={<LoginPage />} />
             <Route element={<Layout />}>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/search" element={<NewSearchPage />} />

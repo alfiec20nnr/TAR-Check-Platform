@@ -1,6 +1,7 @@
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import HistoryIcon from "@mui/icons-material/History";
 import LightModeIcon from "@mui/icons-material/LightMode";
+import LogoutIcon from "@mui/icons-material/Logout";
 import PersonSearchIcon from "@mui/icons-material/PersonSearch";
 import ShieldIcon from "@mui/icons-material/Shield";
 import SpaceDashboardIcon from "@mui/icons-material/SpaceDashboard";
@@ -18,14 +19,15 @@ import {
 import { useEffect, useState } from "react";
 import { Link as RouterLink, Outlet, useLocation } from "react-router-dom";
 
-import { useHealth } from "../api/hooks";
+import { useHealth, useLogout } from "../api/hooks";
 import { useColorMode } from "../theme";
 import WelcomeDialog from "./WelcomeDialog";
 
 /** Lets the single-process (no-Docker) server stop itself when the last tab
  *  closes: announce open/close, and heartbeat while the tab is alive. All
- *  no-ops server-side when auto-shutdown mode is off (e.g. Docker). */
-function useSessionPresence() {
+ *  no-ops server-side when auto-shutdown mode is off (e.g. Docker). Also used
+ *  by the login page so the server doesn't stop while someone signs in. */
+export function useSessionPresence() {
   useEffect(() => {
     const open = () => {
       void fetch("/api/v1/session/open", { method: "POST" }).catch(() => {});
@@ -48,6 +50,9 @@ function useSessionPresence() {
       window.removeEventListener("pageshow", onPageShow);
       window.removeEventListener("pagehide", onPageHide);
       clearInterval(heartbeat);
+      // SPA unmount (e.g. login page → app): balance this component's open().
+      // On a real tab close, pagehide has already fired and this never runs.
+      navigator.sendBeacon("/api/v1/session/close");
     };
   }, []);
 }
@@ -62,6 +67,7 @@ export default function Layout() {
   const { mode, toggle } = useColorMode();
   const location = useLocation();
   const { data: health } = useHealth();
+  const logout = useLogout();
   const [logoOk, setLogoOk] = useState(true);
   useSessionPresence();
 
@@ -111,6 +117,16 @@ export default function Layout() {
           <Tooltip title={mode === "light" ? "Switch to dark mode" : "Switch to light mode"}>
             <IconButton onClick={toggle} color="inherit" aria-label="toggle colour mode">
               {mode === "light" ? <DarkModeIcon /> : <LightModeIcon />}
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Sign out">
+            <IconButton
+              onClick={() => logout.mutate()}
+              color="inherit"
+              aria-label="sign out"
+              disabled={logout.isPending}
+            >
+              <LogoutIcon />
             </IconButton>
           </Tooltip>
         </Toolbar>
