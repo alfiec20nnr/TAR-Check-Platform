@@ -1,87 +1,134 @@
-"""Login endpoints for the single-user lock screen.
+"""Login endpoints.
 
-These are the only API routes (besides /health and the session-presence
-beacons) that do not require a session cookie.
+These are the only API routes (besides /health, licence activation, and the
+session-presence beacons) that do not require a session cookie — except
+change-password, which does.
 """
 
 import asyncio
-import hmac
 import logging
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import auth
 from app.config import get_settings
-from app.ensure_key import set_env_var
-from app.schemas import AuthStatus, LoginRequest, SetupRequest
+from app.database import get_db
+from app.models.user import USERNAME_RE, User, normalise_username
+from app.rate_limit import limiter
+from app.schemas import (
+    AuthStatus,
+    ChangePasswordRequest,
+    LoginRequest,
+    SetupRequest,
+)
+from app.services import audit
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# Flat delay on every failed login. Combined with the global per-IP rate
-# limit this is plenty to blunt brute force on a localhost lock screen.
+# Flat delay on every failed login. Combined with the per-IP rate limits this
+# is plenty to blunt brute force.
 _FAILED_LOGIN_DELAY_SECONDS = 0.5
 
 
 @router.get("/status", response_model=AuthStatus)
-async def auth_status(request: Request) -> AuthStatus:
-    settings = get_settings()
+async def auth_status(
+    request: Request, db: AsyncSession = Depends(get_db)
+) -> AuthStatus:
+    configured = await auth.any_user_exists(db)
+    username = auth.session_username(request) if configured else None
+    if username is not None:
+        user = await auth.get_active_user(db, username)
+        username = user.username if user is not None else None
     return AuthStatus(
-        configured=bool(settings.auth_password_hash),
-        authenticated=bool(settings.auth_password_hash)
-        and auth.is_authenticated(request),
+        configured=configured,
+        authenticated=username is not None,
+        username=username,
     )
 
 
 @router.post("/setup", status_code=204)
-async def setup(payload: SetupRequest, response: Response) -> None:
-    """First-launch credential creation; persists to `.env` and logs in."""
+async def setup(
+    payload: SetupRequest, response: Response, db: AsyncSession = Depends(get_db)
+) -> None:
+    """First-launch account creation (local installs); creates user #1.
+
+    Hosted deployments disable this with AUTH_ALLOW_SETUP=false and seed
+    accounts with `python -m app.users` instead.
+    """
     auth.require_activation()
-    settings = get_settings()
-    if settings.auth_password_hash:
+    if not get_settings().auth_allow_setup:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, detail="Setup is disabled on this deployment."
+        )
+    if await auth.any_user_exists(db):
         raise HTTPException(
             status.HTTP_409_CONFLICT, detail="Credentials are already configured."
         )
-    password_hash = auth.hash_password(payload.password)
-    try:
-        set_env_var("AUTH_USERNAME", payload.username)
-        set_env_var(
-            "AUTH_PASSWORD_HASH",
-            password_hash,
-            comment=["Login credentials — change with: python -m app.set_password"],
+    username = normalise_username(payload.username)
+    if not USERNAME_RE.fullmatch(username):
+        raise HTTPException(
+            422,
+            detail=(
+                "Username must be 3-100 characters using letters, digits, "
+                "dots, dashes, underscores or @."
+            ),
         )
-    except OSError:
-        # e.g. read-only container filesystem: credentials still apply for
-        # this run so the user is not locked out, but will be asked again.
-        logger.exception(
-            "Could not persist credentials to .env — they will apply "
-            "for this run only."
-        )
-    settings.auth_username = payload.username
-    settings.auth_password_hash = password_hash
-    auth.set_session_cookie(response)
-    logger.info("Login credentials created for user %r", payload.username)
+    db.add(User(username=username, password_hash=auth.hash_password(payload.password)))
+    await db.commit()
+    auth.set_session_cookie(response, username)
+    logger.info("Login credentials created for user %r", username)
 
 
 @router.post("/login", status_code=204)
-async def login(payload: LoginRequest, response: Response) -> None:
+@limiter.limit(lambda: get_settings().auth_login_rate_limit)
+async def login(
+    payload: LoginRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+) -> None:
     auth.require_activation()
-    settings = get_settings()
-    if not settings.auth_password_hash:
+    if not await auth.any_user_exists(db):
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED, detail="Initial setup required"
         )
-    username_ok = hmac.compare_digest(
-        payload.username.encode(), settings.auth_username.encode()
-    )
-    password_ok = auth.verify_password(payload.password, settings.auth_password_hash)
-    if not (username_ok and password_ok):
+    username = normalise_username(payload.username)
+    user = await auth.get_active_user(db, username)
+    if user is None or not auth.verify_password(payload.password, user.password_hash):
+        await audit.record(db, "login_failed", details={"username": username})
+        await db.commit()
         await asyncio.sleep(_FAILED_LOGIN_DELAY_SECONDS)
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password."
         )
-    auth.set_session_cookie(response)
+    user.last_login_at = datetime.now(UTC)
+    await audit.record(db, "login_succeeded", actor=user.username)
+    await db.commit()
+    auth.set_session_cookie(response, user.username)
+
+
+@router.post("/change-password", status_code=204)
+async def change_password(
+    payload: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    username: str = Depends(auth.require_auth),
+) -> None:
+    """Self-service password change for the logged-in user."""
+    user = await auth.get_active_user(db, username)
+    if user is None or not auth.verify_password(
+        payload.current_password, user.password_hash
+    ):
+        await asyncio.sleep(_FAILED_LOGIN_DELAY_SECONDS)
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, detail="Current password is incorrect."
+        )
+    user.password_hash = auth.hash_password(payload.new_password)
+    await audit.record(db, "password_changed", actor=user.username)
+    await db.commit()
 
 
 @router.post("/logout", status_code=204)

@@ -8,6 +8,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.auth import require_auth
 from app.config import get_settings
 from app.database import get_db
 from app.models import AISummary, Report, RiskScore, Search, SearchResult, SearchStatus
@@ -23,7 +24,10 @@ router = APIRouter(prefix="/searches", tags=["searches"])
 
 @router.post("", response_model=SearchOut, status_code=202)
 async def submit_search(
-    payload: SearchCreate, request: Request, db: AsyncSession = Depends(get_db)
+    payload: SearchCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    username: str = Depends(require_auth),
 ) -> Search:
     """Submit a search; returns immediately with the search ID.
 
@@ -37,6 +41,7 @@ async def submit_search(
         country=payload.country,
         driving_licence_number=payload.driving_licence_number,
         status=SearchStatus.PENDING.value,
+        created_by=username,
     )
     db.add(search)
     await db.flush()  # populate search.id before the audit entry references it
@@ -44,6 +49,7 @@ async def submit_search(
         db,
         "search_submitted",
         search_id=search.id,
+        actor=username,
         details={
             "country": payload.country,
             "dob_provided": payload.date_of_birth is not None,
@@ -117,7 +123,9 @@ async def _delete_search_rows(db: AsyncSession, search_ids: list[str]) -> None:
 
 
 @router.delete("", status_code=200)
-async def clear_history(db: AsyncSession = Depends(get_db)) -> dict:
+async def clear_history(
+    db: AsyncSession = Depends(get_db), username: str = Depends(require_auth)
+) -> dict:
     """Clear the search history (completed/failed searches only).
 
     In-flight searches are left untouched; audit entries are always retained,
@@ -129,13 +137,19 @@ async def clear_history(db: AsyncSession = Depends(get_db)) -> dict:
         ).scalars()
     )
     await _delete_search_rows(db, ids)
-    await audit.record(db, "history_cleared", details={"deleted": len(ids)})
+    await audit.record(
+        db, "history_cleared", actor=username, details={"deleted": len(ids)}
+    )
     await db.commit()
     return {"deleted": len(ids)}
 
 
 @router.delete("/{search_id}", status_code=204)
-async def delete_search(search_id: str, db: AsyncSession = Depends(get_db)) -> None:
+async def delete_search(
+    search_id: str,
+    db: AsyncSession = Depends(get_db),
+    username: str = Depends(require_auth),
+) -> None:
     """Delete a single search from the history (with its results and report)."""
     search = await db.get(Search, search_id)
     if search is None:
@@ -146,7 +160,7 @@ async def delete_search(search_id: str, db: AsyncSession = Depends(get_db)) -> N
             detail="Search is still running — wait for it to finish before deleting",
         )
     await _delete_search_rows(db, [search_id])
-    await audit.record(db, "search_deleted", search_id=search_id)
+    await audit.record(db, "search_deleted", search_id=search_id, actor=username)
     await db.commit()
 
 

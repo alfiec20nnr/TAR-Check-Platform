@@ -1,5 +1,7 @@
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import HistoryIcon from "@mui/icons-material/History";
+import KeyIcon from "@mui/icons-material/Key";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import LogoutIcon from "@mui/icons-material/Logout";
 import PersonSearchIcon from "@mui/icons-material/PersonSearch";
@@ -11,7 +13,12 @@ import {
   Box,
   Button,
   Container,
+  Divider,
   IconButton,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
   Toolbar,
   Tooltip,
   Typography,
@@ -19,8 +26,9 @@ import {
 import { useEffect, useState } from "react";
 import { Link as RouterLink, Outlet, useLocation } from "react-router-dom";
 
-import { useHealth, useLogout } from "../api/hooks";
+import { useAuthStatus, useHealth, useLogout } from "../api/hooks";
 import { useColorMode } from "../theme";
+import ChangePasswordDialog from "./ChangePasswordDialog";
 import WelcomeDialog from "./WelcomeDialog";
 
 /** Lets the single-process (no-Docker) server stop itself when the last tab
@@ -67,8 +75,11 @@ export default function Layout() {
   const { mode, toggle } = useColorMode();
   const location = useLocation();
   const { data: health } = useHealth();
+  const { data: authStatus } = useAuthStatus();
   const logout = useLogout();
   const [logoOk, setLogoOk] = useState(true);
+  const [accountAnchor, setAccountAnchor] = useState<HTMLElement | null>(null);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   useSessionPresence();
 
   // Configurable display name (APP_NAME in .env, surfaced via /health).
@@ -119,16 +130,55 @@ export default function Layout() {
               {mode === "light" ? <DarkModeIcon /> : <LightModeIcon />}
             </IconButton>
           </Tooltip>
-          <Tooltip title="Sign out">
+          <Tooltip title={authStatus?.username ?? "Account"}>
             <IconButton
-              onClick={() => logout.mutate()}
+              onClick={(e) => setAccountAnchor(e.currentTarget)}
               color="inherit"
-              aria-label="sign out"
-              disabled={logout.isPending}
+              aria-label="account menu"
             >
-              <LogoutIcon />
+              <AccountCircleIcon />
             </IconButton>
           </Tooltip>
+          <Menu
+            anchorEl={accountAnchor}
+            open={accountAnchor !== null}
+            onClose={() => setAccountAnchor(null)}
+          >
+            <MenuItem disabled sx={{ "&.Mui-disabled": { opacity: 1 } }}>
+              <ListItemText
+                primary="Signed in as"
+                secondary={authStatus?.username ?? "—"}
+              />
+            </MenuItem>
+            <Divider />
+            <MenuItem
+              onClick={() => {
+                setAccountAnchor(null);
+                setChangePasswordOpen(true);
+              }}
+            >
+              <ListItemIcon>
+                <KeyIcon fontSize="small" />
+              </ListItemIcon>
+              Change password
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                setAccountAnchor(null);
+                logout.mutate();
+              }}
+              disabled={logout.isPending}
+            >
+              <ListItemIcon>
+                <LogoutIcon fontSize="small" />
+              </ListItemIcon>
+              Sign out
+            </MenuItem>
+          </Menu>
+          <ChangePasswordDialog
+            open={changePasswordOpen}
+            onClose={() => setChangePasswordOpen(false)}
+          />
         </Toolbar>
       </AppBar>
       {health?.mock_connectors && (

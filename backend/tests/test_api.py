@@ -40,6 +40,8 @@ async def test_submit_search_returns_id_immediately(client):
     assert body["id"]
     assert body["status"] == "pending"
     assert body["full_name"] == "Alice Example"
+    # The submitting user is recorded and surfaced ("Run by" in the UI).
+    assert body["created_by"] == "admin"
 
 
 async def test_validation_rejects_bad_input(client):
@@ -210,6 +212,10 @@ async def test_audit_trail_written(client):
     completed = next(e for e in entries if e["action"] == "search_completed")
     for key in ("sources_searched", "duration_ms", "results_found", "report_reference"):
         assert key in completed["details"]
+    # User actions carry the actor; pipeline stages are system actions.
+    submitted = next(e for e in entries if e["action"] == "search_submitted")
+    assert submitted["actor"] == "admin"
+    assert completed["actor"] is None
 
 
 async def test_delete_single_search(client):
@@ -226,11 +232,13 @@ async def test_delete_single_search(client):
     # Other searches are untouched.
     assert (await client.get(f"/api/v1/searches/{keep['id']}")).status_code == 200
 
-    # Deleting is itself audited; the original submission entry survives.
+    # Deleting is itself audited (with the actor); the submission entry survives.
     entries = (await client.get(f"/api/v1/audit?search_id={detail['id']}")).json()
     actions = [e["action"] for e in entries]
     assert "search_deleted" in actions
     assert "search_submitted" in actions
+    deleted = next(e for e in entries if e["action"] == "search_deleted")
+    assert deleted["actor"] == "admin"
 
     missing = await client.delete("/api/v1/searches/does-not-exist")
     assert missing.status_code == 404

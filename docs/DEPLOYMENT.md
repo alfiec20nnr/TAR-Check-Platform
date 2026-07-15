@@ -27,7 +27,7 @@ Minimum production edits in `.env`:
 | `POSTGRES_PASSWORD` | Set a strong password |
 | `ENCRYPTION_KEY` | Generate: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
 | `AUTH_SECRET` | Generate: `python -c "import secrets; print(secrets.token_urlsafe(32))"` (signs login cookies) |
-| `AUTH_USERNAME` / `AUTH_PASSWORD_HASH` | Run `python -m app.set_password` from `backend/` (writes both). If left empty, the UI asks on first launch — but in Docker that choice only lasts until the container is recreated, so set them here for anything long-lived |
+| Accounts | Live in the database, so they survive container recreation. Either let the UI create the first account on first launch, or create accounts up front: `docker compose exec api python -m app.users add <username>` |
 | `LICENCE_KEY` | Machine activation code from the software provider (the UI shows the machine code and asks for it on first launch; in Docker set it here so it survives container recreation) |
 | `MOCK_CONNECTORS` | `false` for real sources |
 | Connector keys | See README table |
@@ -108,3 +108,78 @@ dump alone are low-risk).
 - **Retention:** the worker purges completed searches older than
   `DATA_RETENTION_DAYS` every 6 hours; audit entries are never purged.
 - **Tuning risk/matching:** edit `backend/config/*.yaml` and restart `api`+`worker`.
+- **Accounts:** `docker compose exec api python -m app.users add|list|reset|disable|remove <username>`
+  (`add`/`reset` print a one-time password; users change it from the account menu).
+
+## 7. Hosted on a VPS (internet-facing, multi-user)
+
+One organisation's employees and clients share a single instance behind
+HTTPS. Everything below assumes Ubuntu 24.04 on a small VPS (2 vCPU / 4 GB —
+e.g. Hetzner CX22) with a DNS A record for your chosen hostname pointing at
+it.
+
+### 7.1 Harden the host (once)
+
+```bash
+adduser aip && usermod -aG sudo aip            # then copy your SSH key
+# /etc/ssh/sshd_config: PasswordAuthentication no, PermitRootLogin no
+ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw enable
+apt install -y unattended-upgrades fail2ban
+# Docker Engine + Compose v2 (v2.24+ needed): https://docs.docker.com/engine/install/ubuntu/
+```
+
+> Note: published container ports bypass ufw (Docker programs iptables
+> directly). The prod override therefore publishes **only** Caddy's 80/443 —
+> do not add host ports to other services.
+
+Add Docker log rotation in `/etc/docker/daemon.json`:
+
+```json
+{ "log-driver": "json-file", "log-opts": { "max-size": "10m", "max-file": "3" } }
+```
+
+### 7.2 Configure
+
+```bash
+git clone <repo> /srv/aip/app && cd /srv/aip/app
+cp .env.example .env
+```
+
+On top of the section-2 minimums, set the hosted-mode block in `.env`:
+
+| Variable | Value |
+|---|---|
+| `AIP_DOMAIN` | Your hostname, e.g. `aip.client.co.uk` |
+| `SESSION_COOKIE_SECURE` | `true` |
+| `AUTH_ALLOW_SETUP` | `false` (accounts are seeded by CLI below) |
+| `EXPOSE_API_DOCS` | `false` |
+| `CORS_ORIGINS` | `https://<AIP_DOMAIN>` |
+| `MOCK_CONNECTORS` | `false` + real connector keys |
+
+### 7.3 Go live
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
+
+# Licence: the api logs print the machine code (stable — the host's
+# /etc/machine-id is mounted in). Get an activation code issued for it and
+# set LICENCE_KEY in .env, then restart the api service.
+docker compose logs api | grep -i "machine code"
+
+# Seed accounts BEFORE announcing the URL (setup is disabled):
+docker compose exec api python -m app.users add jane.smith
+```
+
+Caddy obtains and renews the Let's Encrypt certificate automatically; verify
+with `curl -fsS https://<AIP_DOMAIN>/health`.
+
+### 7.4 Operate
+
+- **Updates:** `./deploy/deploy.sh` (git pull + rebuild; migrations run on boot).
+- **Backups:** install `deploy/backup.sh` as a nightly cron; keep
+  `ENCRYPTION_KEY`, `AUTH_SECRET` and a copy of `.env` in a password manager —
+  never alongside the dumps. Test a restore quarterly (section 5).
+- **Monitoring:** point an uptime checker (e.g. UptimeRobot) at
+  `https://<AIP_DOMAIN>/health`.
+- **Joiners/leavers:** `python -m app.users add` / `remove` (or `disable` to
+  keep the account); removal takes effect on the user's next request.

@@ -1,0 +1,9 @@
+# Caddy ingress for the hosted stack (docker-compose.prod.yml).
+# AIP_DOMAIN comes from .env; certificates are obtained and renewed
+# automatically via Let's Encrypt (ports 80+443 must be reachable).
+
+{$AIP_DOMAIN} {
+	encode gzip
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	reverse_proxy web:80
+}

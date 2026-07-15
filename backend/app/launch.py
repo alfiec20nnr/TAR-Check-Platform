@@ -18,16 +18,16 @@ import os
 
 
 async def _seed_and_reset_engine() -> None:
-    """Seed the connector registry, then drop the cached engine.
+    """Seed connectors + default user, then drop the cached engine.
 
     Seeding runs on this temporary event loop; the server creates its own.
     Async connections cannot cross event loops, so the engine cached by
     app.database must be disposed and forgotten before uvicorn starts.
     """
     from app.database import get_engine, reset_engine
-    from app.seed import seed_sources
+    from app.seed import seed_all
 
-    await seed_sources()
+    await seed_all()
     await get_engine().dispose()
     reset_engine()
 
@@ -66,7 +66,7 @@ def _preflight_native_deps() -> None:
             " ============================================================\n",
             flush=True,
         )
-        raise SystemExit(1)
+        raise SystemExit(1) from None
 
 
 def main() -> int:

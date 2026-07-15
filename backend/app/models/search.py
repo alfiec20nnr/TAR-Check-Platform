@@ -38,6 +38,11 @@ class Search(Base):
     # encodes the holder's name and date of birth.
     driving_licence_number: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
 
+    # Username that submitted the search (a plain string, not a foreign key,
+    # so history stays readable after an account is removed). None on rows
+    # created before multi-user accounts existed.
+    created_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
     status: Mapped[str] = mapped_column(
         String(16), default=SearchStatus.PENDING.value, nullable=False, index=True
     )

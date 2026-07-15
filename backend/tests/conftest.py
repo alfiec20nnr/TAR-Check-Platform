@@ -18,6 +18,7 @@ os.environ.update(
         "ANTHROPIC_API_KEY": "",
         "ENCRYPTION_KEY": "",
         "API_RATE_LIMIT": "1000/minute",
+        "AUTH_LOGIN_RATE_LIMIT": "1000/minute",
         "CORS_ORIGINS": "http://testserver",
         "AUTH_USERNAME": "admin",
         "AUTH_SECRET": "test-auth-secret",
@@ -53,11 +54,16 @@ def _activated(monkeypatch):
 
 @pytest.fixture(autouse=True)
 async def _prepare_db():
-    """Fresh schema for every test."""
+    """Fresh schema for every test, with the default user migrated from the
+    legacy env credentials — every test therefore also exercises the
+    .env → users-table upgrade path."""
+    from app.seed import seed_default_user
+
     engine = database.get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
+    await seed_default_user()
     yield
 
 

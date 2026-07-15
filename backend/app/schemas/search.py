@@ -84,6 +84,7 @@ class SearchOut(BaseModel):
     full_name: str
     date_of_birth: str | None = None
     country: str | None = None
+    created_by: str | None = None  # username; None on pre-multi-user rows
     status: str
     error: str | None = None
     created_at: datetime
@@ -141,6 +142,7 @@ class AuditEntryOut(BaseModel):
 
     id: str
     search_id: str | None = None
+    actor: str | None = None  # username; None for system actions
     action: str
     details: dict | None = None
     timestamp: datetime

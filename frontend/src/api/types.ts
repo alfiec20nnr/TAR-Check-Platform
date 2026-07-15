@@ -18,6 +18,8 @@ export interface SearchOut {
   full_name: string;
   date_of_birth: string | null;
   country: string | null;
+  /** Username that submitted the search; null on rows from before accounts existed. */
+  created_by: string | null;
   status: SearchStatus;
   error: string | null;
   created_at: string;
@@ -80,9 +82,11 @@ export interface LicenceStatus {
 }
 
 export interface AuthStatus {
-  /** False until the first-launch setup has chosen a username/password. */
+  /** False until the first account exists. */
   configured: boolean;
   authenticated: boolean;
+  /** The logged-in user's username, when authenticated. */
+  username: string | null;
 }
 
 export interface DashboardStats {

@@ -125,6 +125,13 @@ export function useSetup() {
   });
 }
 
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (payload: { current_password: string; new_password: string }) =>
+      api.post<void>("/auth/change-password", payload),
+  });
+}
+
 export function useLogout() {
   return useMutation({
     mutationFn: () => api.post<void>("/auth/logout", {}),

@@ -1,0 +1,48 @@
+# Hosted (VPS) override — run together with the base file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
+#
+# Adds Caddy in front for automatic HTTPS (Let's Encrypt), stops publishing
+# the plain-HTTP web port on the host, gives the API the host's machine-id so
+# the existing licence activation works unchanged, and trusts the proxy's
+# X-Forwarded-For so rate limiting sees real client IPs.
+#
+# Requires AIP_DOMAIN in .env (plus the hosted settings — see .env.example
+# and docs/DEPLOYMENT.md "Hosted on a VPS").
+
+services:
+  api:
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m app.seed &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000
+               --proxy-headers --forwarded-allow-ips='*'"
+    volumes:
+      # The licence machine code derives from /etc/machine-id on Linux; mount
+      # the host's so it is stable across container rebuilds and the VPS can
+      # be activated once with a normal activation code.
+      - /etc/machine-id:/etc/machine-id:ro
+
+  web:
+    # Caddy is the only ingress; nginx stays internal on the compose network.
+    # (`!reset` needs Compose v2.24+, which the runbook installs.)
+    ports: !reset []
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      AIP_DOMAIN: ${AIP_DOMAIN:?set AIP_DOMAIN in .env (e.g. aip.example.co.uk)}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+volumes:
+  caddy_data:
+  caddy_config:

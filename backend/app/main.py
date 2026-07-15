@@ -1,11 +1,11 @@
 """FastAPI application entry point.
 
-Runs locally / inside a trusted network. Access is protected by a single
-username/password (a lock screen for the machine — see app.auth); there are
-no user accounts, roles, or multi-tenancy. Other application-level
-protections: input validation (Pydantic), rate limiting, CORS, security
-headers, parameterised queries (SQLAlchemy), and encryption-at-rest for
-personal data.
+Runs locally or on a single hosted instance for one organisation. Access
+requires an individual login (see app.auth and app.models.user) — all
+accounts are equal; there are no roles or multi-tenancy. Other
+application-level protections: input validation (Pydantic), rate limiting,
+CORS, security headers, parameterised queries (SQLAlchemy), and
+encryption-at-rest for personal data.
 """
 
 import asyncio
@@ -18,10 +18,9 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from slowapi.util import get_remote_address
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import __version__, licensing
@@ -29,6 +28,7 @@ from app.api.routes import auth as auth_routes
 from app.api.routes import dashboard, licence, reports, searches
 from app.auth import require_auth
 from app.config import get_settings
+from app.rate_limit import limiter
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,8 +37,6 @@ logging.basicConfig(
 
 settings = get_settings()
 
-limiter = Limiter(key_func=get_remote_address, default_limits=[settings.api_rate_limit])
-
 app = FastAPI(
     title=settings.app_name,
     version=__version__,
@@ -46,6 +44,11 @@ app = FastAPI(
         "Adverse-media and public-record due diligence for individuals. "
         "Submit a search, poll its status, and retrieve the generated report."
     ),
+    # Hosted deployments set EXPOSE_API_DOCS=false — no Swagger/OpenAPI pages
+    # on an internet-facing instance.
+    docs_url="/docs" if settings.expose_api_docs else None,
+    redoc_url="/redoc" if settings.expose_api_docs else None,
+    openapi_url="/openapi.json" if settings.expose_api_docs else None,
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

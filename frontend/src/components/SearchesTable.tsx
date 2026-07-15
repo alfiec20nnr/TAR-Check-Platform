@@ -65,6 +65,7 @@ export default function SearchesTable({
             )}
             <TableCell>Subject</TableCell>
             <TableCell>Submitted</TableCell>
+            <TableCell>Run by</TableCell>
             <TableCell>Status</TableCell>
             <TableCell align="right">Results</TableCell>
             <TableCell>Risk</TableCell>
@@ -109,6 +110,7 @@ export default function SearchesTable({
                 </Typography>
               </TableCell>
               <TableCell>{new Date(s.created_at).toLocaleString()}</TableCell>
+              <TableCell>{s.created_by ?? "—"}</TableCell>
               <TableCell>
                 <StatusChip status={s.status} />
               </TableCell>

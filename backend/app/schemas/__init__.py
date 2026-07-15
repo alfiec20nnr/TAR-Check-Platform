@@ -1,4 +1,9 @@
-from app.schemas.auth import AuthStatus, LoginRequest, SetupRequest
+from app.schemas.auth import (
+    AuthStatus,
+    ChangePasswordRequest,
+    LoginRequest,
+    SetupRequest,
+)
 from app.schemas.licence import ActivateRequest, LicenceStatus
 from app.schemas.search import (
     AuditEntryOut,
@@ -15,6 +20,7 @@ __all__ = [
     "ActivateRequest",
     "AuditEntryOut",
     "AuthStatus",
+    "ChangePasswordRequest",
     "LicenceStatus",
     "LoginRequest",
     "SetupRequest",

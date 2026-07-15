@@ -74,6 +74,7 @@ export default function SearchDetailPage() {
         </Stack>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
           Submitted {new Date(data.created_at).toLocaleString()}
+          {data.created_by ? ` by ${data.created_by}` : ""}
           {data.date_of_birth ? ` · DOB ${data.date_of_birth}` : ""}
           {data.country ? ` · ${data.country}` : ""}
           {data.report_reference ? ` · Report ${data.report_reference}` : ""}

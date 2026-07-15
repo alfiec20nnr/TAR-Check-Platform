@@ -24,6 +24,10 @@ class AuditLog(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     search_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    # Username that performed the action; None for system actions (pipeline,
+    # retention, crash recovery). A plain string — not a foreign key — so the
+    # append-only trail stays readable after an account is removed.
+    actor: Mapped[str | None] = mapped_column(String(100), nullable=True)
     action: Mapped[str] = mapped_column(String(64), nullable=False)
     details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(
