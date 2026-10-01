@@ -11,9 +11,12 @@ provider applies the same rules:
   unstructured mentions with a low confidence ceiling
 """
 
+from pathlib import Path
+
 from rapidfuzz import fuzz
 
 from app.connectors.base import Category
+from app.connectors.name_variants import expand_full_name
 
 # A result must actually mention the subject's name in its title/snippet;
 # anything below this partial-match score is provider noise, not evidence.
@@ -50,6 +53,13 @@ CONDUCT_TERMS = [
     "violence", "violent", "assault", "extremis", "slur", "misogyn",
     "homophob", "offensive", "bullying", "doxx", "drugs",
 ]
+
+
+def query_names(full_name: str, matching_config_path: Path) -> list[str]:
+    """The name forms to query with: the name as given, plus nickname/variant
+    forms (e.g. "William Smith" -> also "Bill Smith", "Will Smith") so a
+    source that only ever uses a nickname is still found."""
+    return [full_name, *expand_full_name(full_name, matching_config_path)]
 
 
 def mentions_subject(subject_name: str, text: str) -> bool:

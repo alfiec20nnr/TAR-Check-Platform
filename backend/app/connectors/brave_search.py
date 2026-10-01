@@ -5,10 +5,19 @@ index with an official API open to new customers (unlike Google's Custom
 Search JSON API, closed to new sign-ups since Jan 2026). Free tier available
 at https://api-dashboard.search.brave.com/register — set BRAVE_API_KEY.
 
-Two queries per search (plain name + adverse-media screening query). The free
-tier allows one request per second, and that budget is shared with every other
-Brave-backed connector (e.g. social media), so all Brave requests go through
-one process-wide throttle (:func:`brave_query`).
+For each name form searched (the subject's name as given, plus any
+nickname/variant forms), two queries are run — plain name + adverse-media
+screening query — each paginated across several pages. Names are sent
+unquoted: a quoted phrase forces an exact, contiguous match and misses sources
+that write the name with a middle initial, reordered, or otherwise slightly
+differently — the fuzzy `mentions_subject` check afterwards is what keeps
+results relevant, not the query syntax.
+
+The free tier allows one request per second, and that budget is shared with
+every other Brave-backed connector (e.g. social media) and every page of
+every query, so all Brave requests go through one process-wide throttle
+(:func:`brave_query`). Searching deeper costs time, not correctness — that
+trade-off is intentional.
 """
 
 import asyncio
@@ -22,6 +31,10 @@ API_URL = "https://api.search.brave.com/res/v1/web/search"
 
 # Free-tier rate limit is 1 request/second — shared across connectors.
 _QUERY_SPACING_SECONDS = 1.1
+
+# Brave returns at most 20 results per request; paginate via `offset`.
+_RESULTS_PER_PAGE = 20
+_MAX_PAGES = 3
 
 # Asyncio primitives cannot be shared across event loops, so the throttle is
 # held per running loop (in production there is exactly one).
@@ -38,18 +51,40 @@ async def _throttle() -> None:
     await limiter.acquire()
 
 
-async def brave_query(
-    client: httpx.AsyncClient, api_key: str, query: str, count: int = 20
+async def _brave_request(
+    client: httpx.AsyncClient, api_key: str, query: str, count: int, offset: int
 ) -> list[dict]:
     """One Brave web-search request, throttled across all Brave connectors."""
     await _throttle()
     resp = await client.get(
         API_URL,
-        params={"q": query, "count": count},
+        params={"q": query, "count": count, "offset": offset},
         headers={"Accept": "application/json", "X-Subscription-Token": api_key},
     )
     resp.raise_for_status()
     return ((resp.json().get("web") or {}).get("results")) or []
+
+
+async def brave_query(
+    client: httpx.AsyncClient, api_key: str, query: str, count: int = _RESULTS_PER_PAGE
+) -> list[dict]:
+    """All pages of one Brave web-search query (up to `_MAX_PAGES`)."""
+    results: list[dict] = []
+    for page in range(_MAX_PAGES):
+        try:
+            page_results = await _brave_request(client, api_key, query, count, page * count)
+        except httpx.HTTPStatusError:
+            # A later page failing (e.g. offset beyond what the plan allows)
+            # just means "no more pages" — keep what was already fetched.
+            if page == 0:
+                raise
+            break
+        if not page_results:
+            break
+        results.extend(page_results)
+        if len(page_results) < count:
+            break
+    return results
 
 
 class BraveSearchConnector(BaseConnector):
@@ -64,12 +99,14 @@ class BraveSearchConnector(BaseConnector):
         return mock_data.web_mock(subject, source=self.name)
 
     async def fetch(self, subject: SearchSubject, client: httpx.AsyncClient) -> list[Finding]:
-        name = subject.full_name
+        names = web_common.query_names(subject.full_name, self.settings.matching_config_path)
         api_key = self.settings.brave_api_key
-        results = await brave_query(client, api_key, f'"{name}"')
-        results += await brave_query(
-            client, api_key, f'"{name}" ({web_common.ADVERSE_QUERY_TERMS})'
-        )
+        results: list[dict] = []
+        for name in names:
+            results += await brave_query(client, api_key, name)
+            results += await brave_query(
+                client, api_key, f"{name} ({web_common.ADVERSE_QUERY_TERMS})"
+            )
 
         findings = []
         seen_links: set[str] = set()
@@ -84,7 +121,8 @@ class BraveSearchConnector(BaseConnector):
             # Web pages only *mention* a name — subject_name is deliberately
             # left unset so identity matching treats this as an unstructured
             # mention (low confidence ceiling), never a verified name match.
-            if not web_common.mentions_subject(name, text):
+            # Checked against every name form queried (nicknames included).
+            if not any(web_common.mentions_subject(n, text) for n in names):
                 continue
             page_age = (item.get("page_age") or "")[:10] or None
             findings.append(

@@ -5,17 +5,26 @@
 403 "This project does not have the access to Custom Search JSON API". Use
 the Brave Search connector instead unless you have a grandfathered key.
 
-Two queries per search: the subject's name alone, and the name combined with
-adverse-media terms (the standard screening "dork"). Results whose text
-contains adverse terms are categorised as adverse media so the risk scorer's
-keyword escalation applies; everything else stays in the low-weight web
-category.
+For each name form searched (the subject's name as given, plus any
+nickname/variant forms), two queries are run — the name alone, and the name
+combined with adverse-media terms (the standard screening "dork") — each
+paginated across several pages. Names are sent unquoted: a quoted phrase
+forces an exact, contiguous match and misses sources that write the name with
+a middle initial, reordered ("Smith, John"), or otherwise slightly
+differently — the fuzzy `mentions_subject` check afterwards is what keeps
+results relevant, not the query syntax. Results whose text contains adverse
+terms are categorised as adverse media so the risk scorer's keyword
+escalation applies; everything else stays in the low-weight web category.
 """
 
 import httpx
 
 from app.connectors import mock_data, web_common
 from app.connectors.base import BaseConnector, Finding, SearchSubject
+
+# Google CSE returns at most 10 results per request; paginate via `start`.
+_RESULTS_PER_PAGE = 10
+_MAX_PAGES = 3
 
 
 class GoogleSearchConnector(BaseConnector):
@@ -35,20 +44,39 @@ class GoogleSearchConnector(BaseConnector):
         return mock_data.web_mock(subject, source=self.name)
 
     async def _query(self, client: httpx.AsyncClient, query: str) -> list[dict]:
-        params = {
-            "key": self.settings.google_api_key,
-            "cx": self.settings.google_cse_id,
-            "q": query,
-            "num": 10,
-        }
-        resp = await client.get(self.API_URL, params=params)
-        resp.raise_for_status()
-        return resp.json().get("items", [])
+        items: list[dict] = []
+        for page in range(_MAX_PAGES):
+            params = {
+                "key": self.settings.google_api_key,
+                "cx": self.settings.google_cse_id,
+                "q": query,
+                "num": _RESULTS_PER_PAGE,
+                "start": page * _RESULTS_PER_PAGE + 1,
+            }
+            resp = await client.get(self.API_URL, params=params)
+            try:
+                resp.raise_for_status()
+            except httpx.HTTPStatusError:
+                # The CSE free tier caps how far `start` can page; treat a
+                # later-page failure as "no more pages" and keep what was
+                # already fetched rather than discarding it.
+                if page == 0:
+                    raise
+                break
+            page_items = resp.json().get("items", [])
+            if not page_items:
+                break
+            items.extend(page_items)
+            if len(page_items) < _RESULTS_PER_PAGE:
+                break
+        return items
 
     async def fetch(self, subject: SearchSubject, client: httpx.AsyncClient) -> list[Finding]:
-        name = subject.full_name
-        items = await self._query(client, f'"{name}"')
-        items += await self._query(client, f'"{name}" ({web_common.ADVERSE_QUERY_TERMS})')
+        names = web_common.query_names(subject.full_name, self.settings.matching_config_path)
+        items: list[dict] = []
+        for name in names:
+            items += await self._query(client, name)
+            items += await self._query(client, f"{name} ({web_common.ADVERSE_QUERY_TERMS})")
 
         findings = []
         seen_links: set[str] = set()
@@ -63,7 +91,10 @@ class GoogleSearchConnector(BaseConnector):
             # Web pages only *mention* a name — subject_name is deliberately
             # left unset so identity matching treats this as an unstructured
             # mention (low confidence ceiling), never a verified name match.
-            if not web_common.mentions_subject(name, text):
+            # Checked against every name form queried (nicknames included),
+            # since a result found via a nickname query won't mention the
+            # subject's given name verbatim.
+            if not any(web_common.mentions_subject(n, text) for n in names):
                 continue
             findings.append(
                 Finding(

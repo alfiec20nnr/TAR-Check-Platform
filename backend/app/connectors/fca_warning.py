@@ -7,7 +7,7 @@ developer email + key pair.
 
 import httpx
 
-from app.connectors import mock_data
+from app.connectors import mock_data, web_common
 from app.connectors.base import BaseConnector, Category, Finding, SearchSubject
 
 BASE_URL = "https://register.fca.org.uk/services/V0.1"
@@ -32,23 +32,33 @@ class FcaWarningConnector(BaseConnector):
         }
 
     async def fetch(self, subject: SearchSubject, client: httpx.AsyncClient) -> list[Finding]:
-        resp = await client.get(
-            f"{BASE_URL}/Search",
-            params={"q": subject.full_name, "type": "individual"},
-            headers=self._headers(),
-        )
-        resp.raise_for_status()
-        data = resp.json()
+        names = web_common.query_names(subject.full_name, self.settings.matching_config_path)
+        items: list[dict] = []
+        for name in names:
+            resp = await client.get(
+                f"{BASE_URL}/Search",
+                params={"q": name, "type": "individual"},
+                headers=self._headers(),
+            )
+            resp.raise_for_status()
+            items += resp.json().get("Data", []) or []
+
         findings = []
-        for item in data.get("Data", []) or []:
+        seen_refs: set[str] = set()
+        for item in items:
             status = (item.get("Status") or "").lower()
             name = item.get("Name") or subject.full_name
+            ref = item.get("Reference Number") or item.get("URL") or ""
+            if ref and ref in seen_refs:
+                continue
             # Only surface adverse statuses; clean register entries are not findings.
             adverse = any(
                 token in status for token in ("prohibit", "warning", "unauthorised", "banned")
             )
             if not adverse:
                 continue
+            if ref:
+                seen_refs.add(ref)
             findings.append(
                 Finding(
                     source=self.name,

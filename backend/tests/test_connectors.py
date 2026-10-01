@@ -368,7 +368,9 @@ async def test_social_media_queries_each_platform(monkeypatch):
     result = await connector.run(SUBJECT)
     assert result.status == ConnectorStatus.SUCCESS
     queries = [httpx.QueryParams(c.request.url.query).get("q") for c in route.calls]
-    assert queries == ['"Test Person" site:x.com', '"Test Person" site:reddit.com']
+    # Names are sent unquoted (an exact phrase match misses too much real-world
+    # recall); the fuzzy mention filter afterwards keeps results relevant.
+    assert queries == ["Test Person site:x.com", "Test Person site:reddit.com"]
 
 
 @respx.mock

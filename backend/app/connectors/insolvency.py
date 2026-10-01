@@ -34,6 +34,7 @@ GAZETTE_API_URL = "https://www.thegazette.co.uk/insolvency/notice/data.json"
 # Gazette notice category 25 = Personal Insolvency (24 is corporate).
 _PERSONAL_INSOLVENCY_CATEGORY = "25"
 _PAGE_SIZE = 50
+_MAX_PAGES = 5
 
 _TAG_RE = re.compile(r"<[^>]+>")
 
@@ -128,29 +129,54 @@ class InsolvencyConnector(BaseConnector):
 
     # -- The Gazette (default) ---------------------------------------------------
 
+    async def _query_gazette(self, client: httpx.AsyncClient, name: str) -> list[dict]:
+        entries: list[dict] = []
+        for page in range(1, _MAX_PAGES + 1):
+            resp = await client.get(
+                GAZETTE_API_URL,
+                params={
+                    # Quoted phrases 500 on this API — send plain tokens and
+                    # screen by name locally instead.
+                    "text": name,
+                    "categorycode": _PERSONAL_INSOLVENCY_CATEGORY,
+                    "results-page-size": _PAGE_SIZE,
+                    "start-page": page,
+                },
+                # NB: no Accept header — the .json extension selects the
+                # format, and an explicit "Accept: application/json" makes
+                # the Gazette's content negotiation return HTTP 500.
+                headers={
+                    "User-Agent": f"{self.settings.app_name} (compliance screening)",
+                },
+            )
+            try:
+                resp.raise_for_status()
+            except httpx.HTTPStatusError:
+                if page == 1:
+                    raise
+                break
+            page_entries = _as_list(resp.json().get("entry"))
+            if not page_entries:
+                break
+            entries.extend(page_entries)
+            if len(page_entries) < _PAGE_SIZE:
+                break
+        return entries
+
     async def _fetch_gazette(
         self, subject: SearchSubject, client: httpx.AsyncClient
     ) -> list[Finding]:
-        resp = await client.get(
-            GAZETTE_API_URL,
-            params={
-                # Quoted phrases 500 on this API — send plain tokens and
-                # screen by name locally instead.
-                "text": subject.full_name,
-                "categorycode": _PERSONAL_INSOLVENCY_CATEGORY,
-                "results-page-size": _PAGE_SIZE,
-            },
-            # NB: no Accept header — the .json extension selects the format,
-            # and an explicit "Accept: application/json" makes the Gazette's
-            # content negotiation return HTTP 500.
-            headers={
-                "User-Agent": f"{self.settings.app_name} (compliance screening)",
-            },
-        )
-        resp.raise_for_status()
+        names = web_common.query_names(subject.full_name, self.settings.matching_config_path)
+        entries: list[dict] = []
+        for name in names:
+            entries += await self._query_gazette(client, name)
 
         findings = []
-        for entry in _as_list(resp.json().get("entry")):
+        seen_ids: set[str] = set()
+        for entry in entries:
+            notice_id = entry.get("id") or ""
+            if notice_id and notice_id in seen_ids:
+                continue
             notice_type = (
                 (entry.get("category") or {}).get("@term")
                 or entry.get("title")
@@ -158,9 +184,12 @@ class InsolvencyConnector(BaseConnector):
             )
             snippet = _strip_html(entry.get("content") or "")
             # The notice must actually name the subject — full-name tokens in
-            # the text, same screening rule as the web connectors.
-            if not web_common.mentions_subject(subject.full_name, snippet):
+            # the text, same screening rule as the web connectors. Checked
+            # against every name form queried (nicknames included).
+            if not any(web_common.mentions_subject(n, snippet) for n in names):
                 continue
+            if notice_id:
+                seen_ids.add(notice_id)
             findings.append(
                 Finding(
                     source=self.name,

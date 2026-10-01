@@ -65,13 +65,15 @@ class SocialMediaConnector(BaseConnector):
         ]
 
     async def fetch(self, subject: SearchSubject, client: httpx.AsyncClient) -> list[Finding]:
-        name = subject.full_name
+        names = web_common.query_names(subject.full_name, self.settings.matching_config_path)
         findings = []
         seen_links: set[str] = set()
         for site in self._sites():
-            results = await brave_query(
-                client, self.settings.brave_api_key, f'"{name}" site:{site}'
-            )
+            results: list[dict] = []
+            for name in names:
+                results += await brave_query(
+                    client, self.settings.brave_api_key, f"{name} site:{site}"
+                )
             for item in results:
                 link = item.get("url") or ""
                 # Drop provider noise from other hosts and cross-query repeats.
@@ -83,8 +85,9 @@ class SocialMediaConnector(BaseConnector):
                 text = f"{title} {description}"
                 # Same rule as the web connectors: a post/profile only
                 # *mentions* a name — subject_name stays unset so identity
-                # matching applies its unstructured-mention ceiling.
-                if not web_common.mentions_subject(name, text):
+                # matching applies its unstructured-mention ceiling. Checked
+                # against every name form queried (nicknames included).
+                if not any(web_common.mentions_subject(n, text) for n in names):
                     continue
                 page_age = (item.get("page_age") or "")[:10] or None
                 findings.append(

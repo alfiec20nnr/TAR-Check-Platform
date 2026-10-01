@@ -18,7 +18,7 @@ from typing import Any
 
 import httpx
 
-from app.connectors import mock_data
+from app.connectors import mock_data, web_common
 from app.connectors.base import (
     BaseConnector,
     Category,
@@ -204,14 +204,19 @@ class UkSanctionsConnector(BaseConnector):
 
     async def fetch(self, subject: SearchSubject, client: httpx.AsyncClient) -> list[Finding]:
         designations = await self._load_list(client)
+        # Screen against the subject's name as given plus any nickname/variant
+        # forms — a sanctions alias recorded under a nickname shouldn't be
+        # missed just because the search used the formal given name.
+        names = web_common.query_names(subject.full_name, self.settings.matching_config_path)
         findings = []
         for entry in designations:
             best_score = 0.0
             best_name = None
             for candidate in entry.names:
-                score = screening_score(subject.full_name, candidate)
-                if score > best_score:
-                    best_score, best_name = score, candidate
+                for subject_name in names:
+                    score = screening_score(subject_name, candidate)
+                    if score > best_score:
+                        best_score, best_name = score, candidate
             if best_score < _MATCH_THRESHOLD or best_name is None:
                 continue
             findings.append(
