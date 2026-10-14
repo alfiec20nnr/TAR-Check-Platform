@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 # Verification half of the provider's licensing keypair (the private half
 # lives only on the provider's own machine).
-PUBLIC_KEY_HEX = "c7f93370bfb845a253f5c222bb9597142a0db477253717933e6dc9c9d0722481"
+PUBLIC_KEY_HEX = "3149cd7503d44dd6f9c99607b9288cd3a131e31760c6844204192372720b05aa"
 
 
 def _raw_machine_id() -> str:
