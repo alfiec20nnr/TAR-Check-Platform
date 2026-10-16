@@ -65,7 +65,8 @@ async def _execute(session: AsyncSession, search: Search, settings: Settings) ->
     subject = SearchSubject(
         full_name=search.full_name,
         date_of_birth=search.date_of_birth,
-        country=search.country,
+        # The platform screens UK individuals: no country means the UK.
+        country=search.country or settings.default_country or None,
         location=search.location,
         driving_licence_number=search.driving_licence_number,
     )
@@ -96,6 +97,10 @@ async def _execute(session: AsyncSession, search: Search, settings: Settings) ->
     # 4-5. Identity matching → confidence per candidate record.
     matcher = IdentityMatcher.from_path(settings.matching_config_path)
     scored_findings = [(f, matcher.confidence(subject, f)) for f in findings]
+    # Discard records that are not the person searched for (conflicting
+    # forename, different date of birth) — they are never stored or reported.
+    discarded_count = sum(1 for _, c in scored_findings if not matcher.is_subject(c))
+    scored_findings = [(f, c) for f, c in scored_findings if matcher.is_subject(c)]
 
     # 6. Risk scoring.
     scorer = RiskScorer.from_path(settings.risk_config_path)
@@ -206,6 +211,7 @@ async def _execute(session: AsyncSession, search: Search, settings: Settings) ->
             "sources_searched": sources_searched,
             "duration_ms": duration_ms,
             "results_found": len(result_rows),
+            "results_discarded": discarded_count,
             "risk_level": assessment.level,
             "report_reference": reference,
             "connector_stats": connector_stats,

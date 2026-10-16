@@ -58,13 +58,21 @@ async def _throttle() -> None:
 
 
 async def _brave_request(
-    client: httpx.AsyncClient, api_key: str, query: str, count: int, offset: int
+    client: httpx.AsyncClient,
+    api_key: str,
+    query: str,
+    count: int,
+    offset: int,
+    country: str | None,
 ) -> list[dict]:
     """One Brave web-search request, throttled across all Brave connectors."""
     await _throttle()
+    params: dict = {"q": query, "count": count, "offset": offset}
+    if country:
+        params["country"] = country
     resp = await client.get(
         API_URL,
-        params={"q": query, "count": count, "offset": offset},
+        params=params,
         headers={"Accept": "application/json", "X-Subscription-Token": api_key},
     )
     resp.raise_for_status()
@@ -72,13 +80,21 @@ async def _brave_request(
 
 
 async def brave_query(
-    client: httpx.AsyncClient, api_key: str, query: str, count: int = _RESULTS_PER_PAGE
+    client: httpx.AsyncClient,
+    api_key: str,
+    query: str,
+    count: int = _RESULTS_PER_PAGE,
+    country: str | None = None,
 ) -> list[dict]:
-    """All pages of one Brave web-search query (up to `_MAX_PAGES`)."""
+    """All pages of one Brave web-search query (up to `_MAX_PAGES`).
+
+    `country` (e.g. "GB") localises results to that market."""
     results: list[dict] = []
     for page in range(_MAX_PAGES):
         try:
-            page_results = await _brave_request(client, api_key, query, count, page * count)
+            page_results = await _brave_request(
+                client, api_key, query, count, page * count, country
+            )
         except httpx.HTTPStatusError:
             # A later page failing (e.g. offset beyond what the plan allows)
             # just means "no more pages" — keep what was already fetched.
@@ -107,14 +123,17 @@ class BraveSearchConnector(BaseConnector):
     async def fetch(self, subject: SearchSubject, client: httpx.AsyncClient) -> list[Finding]:
         names = web_common.query_names(subject.full_name, self.settings.matching_config_path)
         api_key = self.settings.brave_api_key
+        country = self.settings.brave_country or None
         results: list[dict] = []
         for name in names:
-            results += await brave_query(client, api_key, name)
+            results += await brave_query(client, api_key, name, country=country)
             results += await brave_query(
-                client, api_key, f"{name} ({web_common.ADVERSE_QUERY_TERMS})"
+                client, api_key, f"{name} ({web_common.ADVERSE_QUERY_TERMS})", country=country
             )
         if subject.location:
-            results += await brave_query(client, api_key, f"{subject.full_name} {subject.location}")
+            results += await brave_query(
+                client, api_key, f"{subject.full_name} {subject.location}", country=country
+            )
 
         findings = []
         seen_links: set[str] = set()

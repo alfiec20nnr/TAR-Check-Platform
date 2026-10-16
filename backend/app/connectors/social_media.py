@@ -17,8 +17,6 @@ fraud, …) are categorised as adverse media so risk scoring escalates them;
 neutral profile/post mentions stay in the low-weight social_media category.
 """
 
-from urllib.parse import urlparse
-
 import httpx
 
 from app.connectors import mock_data, web_common
@@ -37,11 +35,6 @@ PLATFORM_LABELS = {
 }
 
 
-def _on_site(url: str, site: str) -> bool:
-    host = (urlparse(url).netloc or "").lower()
-    return host == site or host.endswith("." + site)
-
-
 class SocialMediaConnector(BaseConnector):
     name = "social_media"
     display_name = "Social Media"
@@ -58,11 +51,7 @@ class SocialMediaConnector(BaseConnector):
         return mock_data.social_mock(subject)
 
     def _sites(self) -> list[str]:
-        return [
-            s.strip().lower()
-            for s in self.settings.social_media_sites.split(",")
-            if s.strip()
-        ]
+        return web_common.parse_sites(self.settings.social_media_sites)
 
     async def fetch(self, subject: SearchSubject, client: httpx.AsyncClient) -> list[Finding]:
         names = web_common.query_names(subject.full_name, self.settings.matching_config_path)
@@ -72,12 +61,15 @@ class SocialMediaConnector(BaseConnector):
             results: list[dict] = []
             for name in names:
                 results += await brave_query(
-                    client, self.settings.brave_api_key, f"{name} site:{site}"
+                    client,
+                    self.settings.brave_api_key,
+                    f"{name} site:{site}",
+                    country=self.settings.brave_country or None,
                 )
             for item in results:
                 link = item.get("url") or ""
                 # Drop provider noise from other hosts and cross-query repeats.
-                if not link or link in seen_links or not _on_site(link, site):
+                if not link or link in seen_links or not web_common.on_site(link, site):
                     continue
                 seen_links.add(link)
                 title = item.get("title", "Untitled result")

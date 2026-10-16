@@ -7,17 +7,16 @@ an exact contiguous phrase — a quoted phrase misses articles that write the
 name with a middle initial or in a different order. The fuzzy mention check
 below is what keeps results relevant, not the query syntax. Results are
 paginated up to `_MAX_PAGES` pages per name form.
+
+Searches are restricted to major UK publications (UK_NEWSPAPER_SITES, sent as
+NewsAPI's `domains` filter) — the platform screens UK individuals. Articles
+that don't name the subject (forename and surname together) are discarded.
 """
 
 import httpx
-from rapidfuzz import fuzz
 
 from app.connectors import mock_data, web_common
 from app.connectors.base import BaseConnector, Category, Finding, SearchSubject
-
-# An article must actually mention the subject's name in its title/description;
-# anything below this partial-match score is provider noise, not evidence.
-_MENTION_THRESHOLD = 70
 
 _PAGE_SIZE = 100
 _MAX_PAGES = 3
@@ -26,7 +25,7 @@ _MAX_PAGES = 3
 class NewsApiConnector(BaseConnector):
     name = "news_api"
     display_name = "News API"
-    description = "Adverse media and news coverage via newsapi.org."
+    description = "Adverse media and news coverage from major UK publications via newsapi.org."
 
     API_URL = "https://newsapi.org/v2/everything"
 
@@ -50,6 +49,9 @@ class NewsApiConnector(BaseConnector):
                 "pageSize": _PAGE_SIZE,
                 "page": page,
             }
+            domains = web_common.parse_sites(self.settings.uk_newspaper_sites)
+            if domains:
+                params["domains"] = ",".join(domains)
             resp = await client.get(self.API_URL, params=params, headers=headers)
             try:
                 resp.raise_for_status()
@@ -79,7 +81,6 @@ class NewsApiConnector(BaseConnector):
 
         findings = []
         seen_urls: set[str] = set()
-        targets = [n.lower() for n in names]
         for article in articles:
             url = article.get("url") or ""
             if url and url in seen_urls:
@@ -87,14 +88,13 @@ class NewsApiConnector(BaseConnector):
             published = (article.get("publishedAt") or "")[:10] or None
             title = article.get("title", "Untitled article")
             description = article.get("description") or ""
-            text = f"{title} {description}".lower()
+            text = f"{title} {description}"
             # News articles only *mention* a name — subject_name is left unset
             # so identity matching treats this as an unstructured mention with
             # a low confidence ceiling, never a verified identity match.
-            # Checked against every name form queried (nicknames included).
-            if not any(
-                fuzz.token_set_ratio(target, text) >= _MENTION_THRESHOLD for target in targets
-            ):
+            # Checked against every name form queried (nicknames included);
+            # articles that don't name the subject are discarded.
+            if not any(web_common.mentions_subject(n, text) for n in names):
                 continue
             if url:
                 seen_urls.add(url)

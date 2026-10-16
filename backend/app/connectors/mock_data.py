@@ -152,6 +152,38 @@ def news_mock(subject: SearchSubject) -> list[Finding]:
     return findings
 
 
+def uk_newspapers_mock(subject: SearchSubject) -> list[Finding]:
+    # UK press coverage — unstructured mentions, like the live connector.
+    name = subject.full_name
+    findings = [
+        Finding(
+            source="uk_newspapers",
+            category=Category.WEB,
+            title=f"{name} named in regional business awards shortlist",
+            description=f"{name} is among the finalists announced this week.",
+            url="https://www.example.co.uk/news/business-awards",
+            date="2024-05-09",
+            raw={"mock": True, "publication": "example.co.uk"},
+        )
+    ]
+    if profile_for(subject) >= MEDIA:
+        findings.append(
+            Finding(
+                source="uk_newspapers",
+                category=Category.ADVERSE_MEDIA,
+                title=f"Customers complain after firm run by {name} collapses",
+                description=(
+                    f"Former customers allege they lost deposits when a company run by "
+                    f"{name} ceased trading. No investigation has been confirmed."
+                ),
+                url="https://www.example.co.uk/news/firm-collapse",
+                date="2024-08-21",
+                raw={"mock": True, "publication": "example.co.uk"},
+            )
+        )
+    return findings
+
+
 def companies_house_mock(subject: SearchSubject) -> list[Finding]:
     name = subject.full_name
     p = profile_for(subject)

@@ -31,6 +31,11 @@ caps:
   # different person.
   name_conflict: 35
 
+# Records scoring below this confidence are discarded before they are stored
+# or reported — they are almost certainly a different person (conflicting
+# forename, different date of birth). Set to 0 to keep everything.
+discard_below: 40
+
 # Nickname/variant equivalences applied before fuzzy name comparison.
 name_variants:
   william: [bill, will, billy, liam]

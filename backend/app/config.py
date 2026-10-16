@@ -88,6 +88,23 @@ class Settings(BaseSettings):
     social_media_sites: str = (
         "x.com,twitter.com,facebook.com,instagram.com,tiktok.com,reddit.com,youtube.com"
     )
+    # Major UK national and regional newspapers / news outlets. Searched via
+    # Brave site-restricted queries (uk_newspapers connector) and used to
+    # restrict NewsAPI to UK publications. Comma-separated hostnames.
+    uk_newspaper_sites: str = (
+        "bbc.co.uk,theguardian.com,thetimes.com,thetimes.co.uk,telegraph.co.uk,"
+        "ft.com,independent.co.uk,inews.co.uk,dailymail.co.uk,mirror.co.uk,"
+        "express.co.uk,thesun.co.uk,standard.co.uk,metro.co.uk,news.sky.com,"
+        "itv.com,dailyrecord.co.uk,scotsman.com,heraldscotland.com,"
+        "walesonline.co.uk,belfasttelegraph.co.uk,irishnews.com,"
+        "manchestereveningnews.co.uk,liverpoolecho.co.uk,birminghammail.co.uk,"
+        "yorkshirepost.co.uk,chroniclelive.co.uk,bristolpost.co.uk,"
+        "nottinghampost.com,pressandjournal.co.uk,thecourier.co.uk,kentonline.co.uk"
+    )
+    # The platform screens UK individuals: Brave results are localised to this
+    # market, and searches without a country are treated as United Kingdom.
+    brave_country: str = "GB"
+    default_country: str = "United Kingdom"
     companies_house_api_key: str = ""
     fca_api_email: str = ""
     fca_api_key: str = ""

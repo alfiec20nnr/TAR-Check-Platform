@@ -457,6 +457,130 @@ async def test_social_media_categorises_and_filters(monkeypatch):
     assert by_url["https://x.com/testperson"].raw["platform"] == "X (Twitter)"
 
 
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Test Person fined by regulator", True),
+        ("<strong>Test</strong> <strong>Person</strong> profile", True),
+        ("Test A. Person appointed", True),
+        ("Test James Person appointed", True),
+        ("Person, Test — court listing", True),
+        ("TEST PERSON speaks", True),
+        ("Test Person's company collapses", True),
+        # Both words present but not naming the subject:
+        ("Test Brown met Sarah Person", False),
+        ("A Person took the test", False),
+        # A different person with a longer name:
+        ("Test Person-Smith wins award", False),
+        ("Testing Persons", False),
+    ],
+)
+def test_mentions_subject_requires_the_name_itself(text, expected):
+    from app.connectors.web_common import mentions_subject
+
+    assert mentions_subject("Test Person", text) is expected
+
+
+@respx.mock
+async def test_news_api_restricted_to_uk_papers_and_filters_other_people():
+    from app.connectors.news_api import NewsApiConnector
+
+    route = respx.get("https://newsapi.org/v2/everything").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "totalResults": 2,
+                "articles": [
+                    {"title": "Test Person charged", "url": "https://www.bbc.co.uk/news/1"},
+                    {
+                        "title": "Test Brown and Jo Person in court",
+                        "url": "https://www.bbc.co.uk/news/2",
+                    },
+                ],
+            },
+        )
+    )
+    connector = NewsApiConnector(
+        real_settings(newsapi_key="k", uk_newspaper_sites="bbc.co.uk, theguardian.com")
+    )
+    result = await connector.run(SUBJECT)
+    assert result.status == ConnectorStatus.SUCCESS
+    params = httpx.QueryParams(route.calls[0].request.url.query)
+    assert params.get("domains") == "bbc.co.uk,theguardian.com"
+    assert [f.url for f in result.findings] == ["https://www.bbc.co.uk/news/1"]
+
+
+@respx.mock
+async def test_uk_newspapers_batches_sites_and_filters(monkeypatch):
+    """UK papers are searched in OR-batches localised to GB; only articles on
+    a listed outlet that actually name the subject are kept."""
+    from app.connectors import brave_search, uk_newspapers
+    from app.connectors.uk_newspapers import UkNewspapersConnector
+
+    monkeypatch.setattr(brave_search, "_QUERY_SPACING_SECONDS", 0.0)
+    monkeypatch.setattr(brave_search, "_limiters", {})
+    monkeypatch.setattr(uk_newspapers, "_SITES_PER_QUERY", 2)
+    route = respx.get("https://api.search.brave.com/res/v1/web/search").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "web": {
+                    "results": [
+                        {
+                            "title": "Test Person jailed for fraud",
+                            "description": "Test Person, 52, was sentenced.",
+                            "url": "https://www.theguardian.com/uk-news/1",
+                            "page_age": "2025-01-02T00:00:00",
+                        },
+                        {
+                            "title": "Test Person opens bakery",
+                            "url": "https://www.manchestereveningnews.co.uk/news/2",
+                        },
+                        {
+                            "title": "Test Smith and Ann Person",
+                            "url": "https://www.theguardian.com/uk-news/3",
+                        },
+                        {
+                            "title": "Test Person profile",
+                            "url": "https://www.nytimes.com/4",
+                        },
+                    ]
+                }
+            },
+        )
+    )
+    connector = UkNewspapersConnector(
+        real_settings(
+            brave_api_key="k",
+            uk_newspaper_sites="theguardian.com,bbc.co.uk,manchestereveningnews.co.uk",
+        )
+    )
+    result = await connector.run(SUBJECT)
+    assert result.status == ConnectorStatus.SUCCESS
+    sent = [httpx.QueryParams(c.request.url.query) for c in route.calls]
+    assert [p.get("q") for p in sent] == [
+        "Test Person (site:theguardian.com OR site:bbc.co.uk)",
+        "Test Person (site:manchestereveningnews.co.uk)",
+    ]
+    assert all(p.get("country") == "GB" for p in sent)
+    by_url = {f.url: f for f in result.findings}
+    assert set(by_url) == {
+        "https://www.theguardian.com/uk-news/1",
+        "https://www.manchestereveningnews.co.uk/news/2",
+    }
+    assert by_url["https://www.theguardian.com/uk-news/1"].category == Category.ADVERSE_MEDIA
+    assert by_url["https://www.theguardian.com/uk-news/1"].date == "2025-01-02"
+    assert by_url["https://www.manchestereveningnews.co.uk/news/2"].category == Category.WEB
+    assert all(f.subject_name is None for f in result.findings)
+
+
+async def test_uk_newspapers_skipped_without_brave_key():
+    from app.connectors.uk_newspapers import UkNewspapersConnector
+
+    result = await UkNewspapersConnector(real_settings(brave_api_key="")).run(SUBJECT)
+    assert result.status == ConnectorStatus.SKIPPED
+
+
 # Mirrors the live response shape of the Gazette notice-feed API (Atom-derived
 # JSON), captured 2026-07-11.
 _GAZETTE_JSON = {

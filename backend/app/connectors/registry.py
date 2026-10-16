@@ -18,9 +18,11 @@ from app.connectors.insolvency import InsolvencyConnector
 from app.connectors.news_api import NewsApiConnector
 from app.connectors.sanctions import UkSanctionsConnector
 from app.connectors.social_media import SocialMediaConnector
+from app.connectors.uk_newspapers import UkNewspapersConnector
 
 CONNECTOR_CLASSES: list[type[BaseConnector]] = [
     BraveSearchConnector,
+    UkNewspapersConnector,
     GoogleSearchConnector,
     SocialMediaConnector,
     NewsApiConnector,

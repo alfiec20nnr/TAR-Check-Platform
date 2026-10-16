@@ -107,8 +107,9 @@ Set `MOCK_CONNECTORS=false` and provide keys in `.env`:
 |---|---|---|
 | Brave Web Search | `BRAVE_API_KEY` | [api-dashboard.search.brave.com](https://api-dashboard.search.brave.com/register) — recommended web source, free tier |
 | Social Media | `BRAVE_API_KEY` (same key) | Public posts/profiles on X/Twitter, Facebook, Instagram, TikTok, Reddit, YouTube via Brave's index — platforms configurable with `SOCIAL_MEDIA_SITES` |
+| UK Newspapers | `BRAVE_API_KEY` (same key) | Major UK national and regional papers and broadcasters (BBC, Guardian, Times, Telegraph, FT, Mail, Mirror, Sky News, regional titles…) via Brave's index — outlets configurable with `UK_NEWSPAPER_SITES` |
 | Google Search | `GOOGLE_API_KEY`, `GOOGLE_CSE_ID` | ⚠ Closed to new customers since Jan 2026 — grandfathered keys only |
-| News API | `NEWSAPI_KEY` | newsapi.org |
+| News API | `NEWSAPI_KEY` | newsapi.org — restricted to the `UK_NEWSPAPER_SITES` outlets |
 | UK Companies House | `COMPANIES_HOUSE_API_KEY` | developer.company-information.service.gov.uk |
 | FCA register | `FCA_API_EMAIL`, `FCA_API_KEY` | register.fca.org.uk/Developer |
 | UK Sanctions List | **none — works out of the box** | Live FCDO XML feed (default URL); a licensed provider JSON endpoint also works |
@@ -116,6 +117,14 @@ Set `MOCK_CONNECTORS=false` and provide keys in `.env`:
 | DVLA Driving Licence (ADD) | `DVLA_USERNAME`, `DVLA_PASSWORD`, `DVLA_API_KEY` (+ `DVLA_API_BASE_URL` for prod) | Commercial agreement with DVLA ([developer portal](https://developer-portal.driver-vehicle-licensing.api.gov.uk/)); UAT is the default environment |
 
 Connectors without credentials are skipped gracefully; the rest still run.
+
+Searching is UK-focused: Brave results are localised to the UK (`BRAVE_COUNTRY=GB`),
+and a search with no country is treated as United Kingdom (`DEFAULT_COUNTRY`).
+Web, news and social results are kept only when they actually name the subject
+(forename and surname together — "John Smith", "John A. Smith", "Smith, John"),
+and records the identity matcher scores below `discard_below` in
+`config/matching_weights.yaml` (a conflicting forename or a different date of
+birth) are discarded rather than reported.
 
 **DVLA driving licence check** — optional per search: supply a driving licence
 number (plus a mandatory driver-consent attestation, recorded in the audit

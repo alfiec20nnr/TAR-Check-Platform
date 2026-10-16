@@ -28,6 +28,7 @@ class MatchingConfig:
     mention_cap: float
     name_conflict_cap: float
     name_variants: dict[str, list[str]]
+    discard_below: float = 40.0
 
     @classmethod
     def load(cls, path: Path) -> "MatchingConfig":
@@ -41,6 +42,7 @@ class MatchingConfig:
             mention_cap=float(caps.get("unstructured_mention", 55)),
             name_conflict_cap=float(caps.get("name_conflict", 35)),
             name_variants=data.get("name_variants", {}),
+            discard_below=float(data.get("discard_below", 40)),
         )
 
 
@@ -204,3 +206,8 @@ class IdentityMatcher:
         if dob_mismatch:
             confidence = min(confidence, self.config.dob_mismatch_cap)
         return round(confidence, 1)
+
+    def is_subject(self, confidence: float) -> bool:
+        """Whether a record scored `confidence` is plausibly the subject at
+        all; records below `discard_below` are a different person."""
+        return confidence >= self.config.discard_below

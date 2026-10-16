@@ -96,6 +96,19 @@ def test_dob_mismatch_caps_confidence():
     assert m.confidence(subject, f) <= m.config.dob_mismatch_cap
 
 
+def test_other_people_are_discarded_but_the_subject_is_kept():
+    """Records the matcher scores as a different person (conflicting forename,
+    different DOB) fall below `discard_below`; genuine mentions survive."""
+    m = matcher()
+    subject = SearchSubject(full_name="Philip Green", date_of_birth="1952-03-15")
+    assert not m.is_subject(m.confidence(subject, make_finding(subject_name="Terry Green")))
+    assert not m.is_subject(
+        m.confidence(subject, make_finding(subject_name="Philip Green", date_of_birth="1980"))
+    )
+    assert m.is_subject(m.confidence(subject, make_finding(subject_name="Philip Green")))
+    assert m.is_subject(m.confidence(subject, make_finding(title="Philip Green fined")))
+
+
 def test_dob_partial_year_only():
     m = matcher()
     score, mismatch = m.dob_score("1980-04-12", "1980")

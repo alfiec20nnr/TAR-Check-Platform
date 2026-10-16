@@ -3,7 +3,10 @@
 Web results are unstructured mentions, not attributed records, so every
 provider applies the same rules:
 
-- results must actually mention the subject's name (mention filter)
+- results must actually name the subject (mention filter): the forename and
+  surname must appear together as a name — "John Smith", "John A. Smith",
+  "John Paul Smith" or "Smith, John" — not merely somewhere in the text
+  ("John Brown met Sarah Smith" is discarded)
 - results containing adverse terms are categorised as adverse media so the
   risk scorer's keyword escalation applies; everything else stays in the
   low-weight web category
@@ -11,16 +14,18 @@ provider applies the same rules:
   unstructured mentions with a low confidence ceiling
 """
 
+import functools
+import re
+import unicodedata
 from pathlib import Path
-
-from rapidfuzz import fuzz
+from urllib.parse import urlparse
 
 from app.connectors.base import Category
 from app.connectors.name_variants import expand_full_name
 
-# A result must actually mention the subject's name in its title/snippet;
-# anything below this partial-match score is provider noise, not evidence.
-MENTION_THRESHOLD = 70
+# Up to this many middle names/initials may sit between forename and surname
+# ("John Paul Smith", "John A. B. Smith") and still count as the subject.
+_MAX_MIDDLE_TOKENS = 2
 
 # Terms that mark a result as adverse media rather than a neutral web mention.
 # Aligned with (a superset of) the serious keywords in config/risk_weights.yaml,
@@ -62,8 +67,52 @@ def query_names(full_name: str, matching_config_path: Path) -> list[str]:
     return [full_name, *expand_full_name(full_name, matching_config_path)]
 
 
+def _normalise_text(text: str) -> str:
+    """Lowercase, strip HTML tags (Brave wraps hits in <strong>) and accents,
+    and reduce punctuation to spaces — keeping the commas, apostrophes,
+    hyphens and full stops that name forms rely on."""
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = re.sub(r"[^\w\s,'.-]", " ", text.lower())
+    return " ".join(text.split())
+
+
+@functools.lru_cache(maxsize=64)
+def _name_pattern(subject_name: str) -> re.Pattern[str] | None:
+    tokens = [re.escape(t.strip(".,")) for t in _normalise_text(subject_name).split()]
+    tokens = [t for t in tokens if t]
+    if not tokens:
+        return None
+    # Name boundaries: not inside another word, and not the first half of a
+    # hyphenated double-barrelled name ("Smith-Jones" is someone else).
+    start, end = r"(?<![\w-])", r"(?![\w]|-\w)"
+    if len(tokens) == 1:
+        return re.compile(start + tokens[0] + end)
+    first, last = tokens[0], tokens[-1]
+    middle = r"\s+(?:[\w'.-]+\s+){0," + str(_MAX_MIDDLE_TOKENS) + "}"
+    forward = start + first + middle + last + end  # John (Paul) Smith
+    reverse = start + last + r"\s*,\s*" + first + end  # Smith, John
+    return re.compile(f"{forward}|{reverse}")
+
+
 def mentions_subject(subject_name: str, text: str) -> bool:
-    return fuzz.token_set_ratio(subject_name.lower(), text.lower()) >= MENTION_THRESHOLD
+    """Whether `text` names the subject — forename and surname together as a
+    name, not just both words appearing somewhere. Results that fail this are
+    about someone else (or no one) and are discarded."""
+    pattern = _name_pattern(subject_name)
+    return bool(pattern and pattern.search(_normalise_text(text)))
+
+
+def on_site(url: str, site: str) -> bool:
+    """Whether `url` is hosted on `site` or one of its subdomains."""
+    host = (urlparse(url).netloc or "").lower()
+    return host == site or host.endswith("." + site)
+
+
+def parse_sites(value: str) -> list[str]:
+    """A comma-separated hostname setting as a clean list."""
+    return [s.strip().lower() for s in value.split(",") if s.strip()]
 
 
 def categorise(

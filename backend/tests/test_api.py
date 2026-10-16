@@ -145,6 +145,7 @@ async def test_sources_registry(client):
         "brave_search",
         "google_search",
         "social_media",
+        "uk_newspapers",
         "news_api",
         "companies_house",
         "insolvency_register",
