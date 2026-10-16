@@ -56,6 +56,7 @@
   <tr><th>Full name</th><td>{{ subject.full_name }}</td></tr>
   <tr><th>Date of birth</th><td>{{ subject.date_of_birth or "Not provided" }}</td></tr>
   <tr><th>Country</th><td>{{ subject.country or "Not provided" }}</td></tr>
+  <tr><th>Location</th><td>{{ subject.location or "Not provided" }}</td></tr>
   <tr><th>Sources searched</th><td>{{ sources_searched | join(", ") }}</td></tr>
   <tr><th>Search duration</th><td>{{ duration_ms }} ms</td></tr>
 </table>

@@ -66,6 +66,7 @@ async def _execute(session: AsyncSession, search: Search, settings: Settings) ->
         full_name=search.full_name,
         date_of_birth=search.date_of_birth,
         country=search.country,
+        location=search.location,
         driving_licence_number=search.driving_licence_number,
     )
 
@@ -152,6 +153,7 @@ async def _execute(session: AsyncSession, search: Search, settings: Settings) ->
             "full_name": search.full_name,
             "date_of_birth": search.date_of_birth,
             "country": search.country,
+            "location": search.location,
         },
         risk={
             "score": assessment.score,

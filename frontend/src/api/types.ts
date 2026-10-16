@@ -7,6 +7,8 @@ export interface SearchCreate {
   full_name: string;
   date_of_birth?: string | null;
   country?: string | null;
+  /** Optional town/city/region — adds an extra location-narrowed web search. */
+  location?: string | null;
   /** Optional — enables the DVLA driving licence check. */
   driving_licence_number?: string | null;
   /** Required attestation whenever a licence number is supplied. */
@@ -18,6 +20,7 @@ export interface SearchOut {
   full_name: string;
   date_of_birth: string | null;
   country: string | null;
+  location: string | null;
   /** Username that submitted the search; null on rows from before accounts existed. */
   created_by: string | null;
   status: SearchStatus;

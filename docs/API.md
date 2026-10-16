@@ -46,6 +46,7 @@ Content-Type: application/json
   "full_name": "John Smith",          // required, 2-200 chars
   "date_of_birth": "1975-03-02",      // optional, ISO date, not in future
   "country": "United Kingdom",         // optional
+  "location": "Manchester",            // optional — adds an extra name+location web search
   "driving_licence_number": "SMITH753020J99AB",  // optional — enables DVLA check
   "licence_check_consent": true        // mandatory when a licence number is given
 }

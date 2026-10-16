@@ -127,6 +127,34 @@ async def test_brave_connector_normalises_and_categorises():
 
 
 @respx.mock
+async def test_brave_location_adds_extra_narrowing_query(monkeypatch):
+    """A supplied location runs one extra query (name + location) on top of
+    the regular ones; without a location no such query is sent."""
+    from app.connectors import brave_search
+    from app.connectors.brave_search import BraveSearchConnector
+
+    monkeypatch.setattr(brave_search, "_QUERY_SPACING_SECONDS", 0.0)
+    monkeypatch.setattr(brave_search, "_limiters", {})
+    route = respx.get("https://api.search.brave.com/res/v1/web/search").mock(
+        return_value=httpx.Response(200, json={"web": {"results": []}})
+    )
+    connector = BraveSearchConnector(real_settings(brave_api_key="k"))
+
+    await connector.run(SUBJECT)
+    without = [httpx.QueryParams(c.request.url.query).get("q") for c in route.calls]
+    assert not any("Manchester" in q for q in without)
+
+    located = SearchSubject(full_name="Test Person", location="Manchester")
+    result = await connector.run(located)
+    assert result.status == ConnectorStatus.SUCCESS
+    queries = [
+        httpx.QueryParams(c.request.url.query).get("q") for c in route.calls[len(without):]
+    ]
+    assert queries[:-1] == without  # regular queries unchanged
+    assert queries[-1] == "Test Person Manchester"
+
+
+@respx.mock
 async def test_google_adverse_results_categorised_as_adverse_media():
     """Results containing adverse terms become adverse_media (so the risk
     scorer's keyword escalation applies); neutral pages stay low-weight web."""

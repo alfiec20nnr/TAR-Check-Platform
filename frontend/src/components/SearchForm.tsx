@@ -17,6 +17,7 @@ export default function SearchForm({ compact = false }: { compact?: boolean }) {
   const [fullName, setFullName] = useState("");
   const [dob, setDob] = useState("");
   const [country, setCountry] = useState("");
+  const [location, setLocation] = useState("");
   const [licenceNumber, setLicenceNumber] = useState("");
   const [licenceConsent, setLicenceConsent] = useState(false);
   const submit = useSubmitSearch();
@@ -31,6 +32,7 @@ export default function SearchForm({ compact = false }: { compact?: boolean }) {
         full_name: fullName.trim(),
         date_of_birth: dob || null,
         country: country.trim() || null,
+        location: location.trim() || null,
         driving_licence_number: licenceNumber.trim() || null,
         licence_check_consent: licenceEntered ? licenceConsent : false,
       },
@@ -64,6 +66,19 @@ export default function SearchForm({ compact = false }: { compact?: boolean }) {
           onChange={(e) => setCountry(e.target.value)}
           fullWidth
           placeholder="United Kingdom"
+        />
+        <TextField
+          label="Location (optional)"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          fullWidth
+          placeholder="e.g. Manchester"
+          inputProps={{ maxLength: 100 }}
+          helperText={
+            compact
+              ? undefined
+              : "Town, city or region — runs an extra web search to narrow results for common or famous names."
+          }
         />
         {!compact && (
           <>

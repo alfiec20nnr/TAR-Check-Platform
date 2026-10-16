@@ -13,6 +13,12 @@ that write the name with a middle initial, reordered, or otherwise slightly
 differently — the fuzzy `mentions_subject` check afterwards is what keeps
 results relevant, not the query syntax.
 
+When the search has a location (town/city/region), one extra query is run:
+the subject's name with the location appended. Common or famous names (a
+celebrity namesake, say) otherwise swamp the results; the location-anchored
+query surfaces pages about the local individual. The regular queries still
+run, so nothing is lost when the location appears in few sources.
+
 The free tier allows one request per second, and that budget is shared with
 every other Brave-backed connector (e.g. social media) and every page of
 every query, so all Brave requests go through one process-wide throttle
@@ -107,6 +113,8 @@ class BraveSearchConnector(BaseConnector):
             results += await brave_query(
                 client, api_key, f"{name} ({web_common.ADVERSE_QUERY_TERMS})"
             )
+        if subject.location:
+            results += await brave_query(client, api_key, f"{subject.full_name} {subject.location}")
 
         findings = []
         seen_links: set[str] = set()

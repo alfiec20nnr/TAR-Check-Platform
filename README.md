@@ -213,7 +213,7 @@ docker-compose.yml  Postgres + API + worker + nginx web
 
 ## Compliance notes
 
-- **Data minimisation** — only full name, optional DOB, optional country are collected.
+- **Data minimisation** — only full name, optional DOB, optional country and optional location are collected (location is encrypted at rest and used only to narrow web searches).
 - **Encryption at rest** — subject name/DOB encrypted with Fernet (`ENCRYPTION_KEY`).
 - **Append-only audit** — every search is recorded; audit entries are never
   deleted, including by the retention job.

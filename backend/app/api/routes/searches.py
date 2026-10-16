@@ -39,6 +39,7 @@ async def submit_search(
         full_name=payload.full_name,
         date_of_birth=payload.date_of_birth.isoformat() if payload.date_of_birth else None,
         country=payload.country,
+        location=payload.location,
         driving_licence_number=payload.driving_licence_number,
         status=SearchStatus.PENDING.value,
         created_by=username,
@@ -53,6 +54,7 @@ async def submit_search(
         details={
             "country": payload.country,
             "dob_provided": payload.date_of_birth is not None,
+            "location_provided": payload.location is not None,
             # The licence number itself is never audited — only the fact a
             # consented DVLA check was requested.
             "licence_check_requested": payload.driving_licence_number is not None,

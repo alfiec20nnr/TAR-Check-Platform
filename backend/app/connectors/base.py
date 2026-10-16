@@ -68,6 +68,9 @@ class SearchSubject:
     full_name: str
     date_of_birth: str | None = None  # ISO date string
     country: str | None = None
+    # Optional town/city/region; web-search connectors run an extra query
+    # with it appended to narrow results for common or famous names.
+    location: str | None = None
     # Optional; enables the DVLA driving-licence check. Only accepted by the
     # API together with a recorded driver-consent attestation.
     driving_licence_number: str | None = None

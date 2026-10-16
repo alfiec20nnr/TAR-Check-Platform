@@ -14,6 +14,15 @@ class SearchCreate(BaseModel):
     full_name: str = Field(min_length=2, max_length=200, description="Full name (required)")
     date_of_birth: date | None = Field(default=None, description="Date of birth (optional)")
     country: str | None = Field(default=None, max_length=64, description="Country (optional)")
+    location: str | None = Field(
+        default=None,
+        max_length=100,
+        description=(
+            "Specific location, e.g. town or city (optional) — runs an extra "
+            "web search with the location appended to narrow results for "
+            "common or famous names."
+        ),
+    )
     driving_licence_number: str | None = Field(
         default=None,
         max_length=24,
@@ -38,7 +47,7 @@ class SearchCreate(BaseModel):
             raise ValueError("full_name must contain letters")
         return v
 
-    @field_validator("country")
+    @field_validator("country", "location")
     @classmethod
     def normalise_country(cls, v: str | None) -> str | None:
         if v is None:
@@ -84,6 +93,7 @@ class SearchOut(BaseModel):
     full_name: str
     date_of_birth: str | None = None
     country: str | None = None
+    location: str | None = None
     created_by: str | None = None  # username; None on pre-multi-user rows
     status: str
     error: str | None = None

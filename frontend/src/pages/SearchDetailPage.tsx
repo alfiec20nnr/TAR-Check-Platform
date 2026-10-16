@@ -77,6 +77,7 @@ export default function SearchDetailPage() {
           {data.created_by ? ` by ${data.created_by}` : ""}
           {data.date_of_birth ? ` · DOB ${data.date_of_birth}` : ""}
           {data.country ? ` · ${data.country}` : ""}
+          {data.location ? ` · ${data.location}` : ""}
           {data.report_reference ? ` · Report ${data.report_reference}` : ""}
         </Typography>
       </Grid>
