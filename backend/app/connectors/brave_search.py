@@ -48,7 +48,8 @@ API_URL = "https://api.search.brave.com/res/v1/web/search"
 # Free-tier rate limit is 1 request/second — shared across connectors.
 _QUERY_SPACING_SECONDS = 1.1
 
-# Brave returns at most 20 results per request; paginate via `offset`.
+# Brave returns at most 20 results per request; paginate via `offset`, which
+# Brave counts in PAGES (0-9), not results — offset=1 is results 21-40.
 _RESULTS_PER_PAGE = 20
 _MAX_PAGES = 3
 
@@ -145,7 +146,7 @@ async def brave_query(
     for page in range(_MAX_PAGES):
         try:
             page_results = await _brave_request(
-                client, api_key, query, count, page * count, country, priority
+                client, api_key, query, count, page, country, priority
             )
         except httpx.HTTPStatusError:
             # A later page failing (e.g. offset beyond what the plan allows)

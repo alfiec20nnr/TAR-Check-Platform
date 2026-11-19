@@ -154,6 +154,25 @@ async def test_brave_query_plan_order(monkeypatch):
     assert "Bill Person" in queries[4:]  # nickname variants come last
 
 
+@respx.mock
+async def test_brave_paginates_by_page_index(monkeypatch):
+    """Brave's `offset` is a page index (0-9), not a result count — sending
+    offset=20 is rejected with HTTP 422 and silently loses pages 2+."""
+    from app.connectors import brave_search
+
+    monkeypatch.setattr(brave_search, "_QUERY_SPACING_SECONDS", 0.0)
+    monkeypatch.setattr(brave_search, "_limiters", {})
+    full_page = {"web": {"results": [{"url": f"https://e.com/{i}"} for i in range(20)]}}
+    route = respx.get("https://api.search.brave.com/res/v1/web/search").mock(
+        return_value=httpx.Response(200, json=full_page)
+    )
+    async with httpx.AsyncClient() as client:
+        results = await brave_search.brave_query(client, "k", "Test Person")
+    offsets = [httpx.QueryParams(c.request.url.query).get("offset") for c in route.calls]
+    assert offsets == ["0", "1", "2"]
+    assert len(results) == 60
+
+
 def test_brave_query_plan_skips_missing_inputs():
     from app.connectors.brave_search import build_queries
 

@@ -36,7 +36,10 @@ tiers:
         - market abuse
         - ponzi
         - pyramid scheme
-        - scam*
+        - scam
+        - scammed
+        - scammer*
+        - scamming
         - con man
         - conman
         - con artist
@@ -218,7 +221,8 @@ tiers:
         - bladed article*
         - offensive weapon*
         - ammunition
-        - explosive*
+        - explosives
+        - explosive device*
         - bomb
         - bombs
         - bomber*
