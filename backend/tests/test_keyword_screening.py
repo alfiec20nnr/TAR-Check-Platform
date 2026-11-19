@@ -122,3 +122,49 @@ def test_dob_in_text_lifts_confidence_and_conflict_discards():
     assert m.confidence(subject, plain) <= m.config.mention_cap
     assert m.confidence(subject, verified) > m.config.mention_cap
     assert not m.is_subject(m.confidence(subject, other))
+
+
+# -- location boost, media threshold, supporting-findings cap -----------------
+
+
+def test_location_mention_lifts_confidence():
+    m = IdentityMatcher.from_path(get_settings().matching_config_path)
+    subject = SearchSubject(full_name="Sam O Neil", location="Manchester")
+    local = Finding(
+        source="x",
+        category=Category.ADVERSE_MEDIA,
+        title="Drugs gang jailed",
+        description="When one of the gang, Sam O'Neill, was arrested",
+        url="https://www.bbc.co.uk/news/uk-england-manchester-46909701",
+    )
+    elsewhere = Finding(
+        source="x",
+        category=Category.ADVERSE_MEDIA,
+        title="Sam O'Neil back in court",
+        url="https://www.oswegocountynewsnow.com/news/x",
+    )
+    assert m.confidence(subject, local) == m.config.location_in_text_cap
+    assert m.confidence(subject, elsewhere) == m.config.mention_cap
+    # Any part of a comma-separated location counts; whole words only.
+    assert m.location_mentioned("Salford, Manchester", local)
+    assert not m.location_mentioned("Chester", local)
+
+
+def test_uncorroborated_media_mention_does_not_move_risk_score():
+    scorer = RiskScorer.from_path(get_settings().risk_config_path)
+    story = Finding(source="x", category=Category.ADVERSE_MEDIA, title="Smith jailed for fraud")
+    assert scorer.assess([(story, 55.0)]).score == 0.0  # bare mention: shown, not scored
+    assert scorer.assess([(story, 70.0)]).score > 0  # corroborated by location
+    # Structured records keep the normal threshold.
+    bankrupt = Finding(source="x", category=Category.INSOLVENCY, title="Bankruptcy order")
+    assert scorer.assess([(bankrupt, 55.0)]).score > 0
+
+
+def test_only_top_supporting_findings_count():
+    scorer = RiskScorer.from_path(get_settings().risk_config_path)
+    findings = [
+        (Finding(source="x", category=Category.ADVERSE_MEDIA, title=f"Smith fined {i}"), 70.0)
+        for i in range(30)
+    ]
+    six = scorer.assess(findings[:6]).score
+    assert scorer.assess(findings).score == six  # findings beyond the top 5 add nothing

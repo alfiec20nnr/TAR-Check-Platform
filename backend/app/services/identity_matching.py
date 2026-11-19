@@ -17,7 +17,9 @@ import yaml
 from rapidfuzz import fuzz
 
 from app.connectors.base import Finding, SearchSubject
+from app.connectors.web_common import compact_name_particles, mentions_subject
 from app.services import dob_evidence
+from app.services.keyword_screening import normalise_text
 
 
 @dataclass
@@ -34,6 +36,9 @@ class MatchingConfig:
     # date-of-birth evidence — see services/dob_evidence.py.
     dob_in_text_cap: float = 90.0
     partial_dob_in_text_cap: float = 65.0
+    # A record mentioning the user-entered location (town/city).
+    location_in_text_cap: float = 70.0
+    location_corroborated_cap: float = 75.0
 
     @classmethod
     def load(cls, path: Path) -> "MatchingConfig":
@@ -50,6 +55,8 @@ class MatchingConfig:
             discard_below=float(data.get("discard_below", 40)),
             dob_in_text_cap=float(caps.get("dob_in_text", 90)),
             partial_dob_in_text_cap=float(caps.get("partial_dob_in_text", 65)),
+            location_in_text_cap=float(caps.get("location_in_text", 70)),
+            location_corroborated_cap=float(caps.get("location_corroborated", 75)),
         )
 
 
@@ -59,8 +66,9 @@ def _load_config(path_str: str) -> MatchingConfig:
 
 
 def _normalise(text: str) -> str:
-    text = re.sub(r"[^a-z\s'-]", " ", text.lower())
-    return " ".join(text.split())
+    text = re.sub(r"[^a-z\s'-]", " ", text.lower().replace("’", "'"))
+    # O'Neill / O Neill / ONeill (and Mc...) compare as one surname.
+    return compact_name_particles(" ".join(text.split()))
 
 
 class IdentityMatcher:
@@ -160,13 +168,42 @@ class IdentityMatcher:
         title/description. This is weaker evidence than a source-attributed
         name, so callers cap it at `unstructured_mention`.
         """
-        text = self._canonicalise(f"{finding.title} {finding.description or ''}")
+        raw_text = f"{finding.title} {finding.description or ''}"
+        # The same name rule the connectors filter on (forename + surname
+        # together, prefix- and spelling-tolerant) counts as a full mention.
+        if mentions_subject(subject_name, raw_text):
+            return 100.0
+        text = self._canonicalise(raw_text)
         target = self._canonicalise(subject_name)
         if not target or not text:
             return 0.0
         # token_set_ratio scores 100 when every name token appears in the text
         # and stays low otherwise; partial_ratio is too noisy for short names.
         return float(fuzz.token_set_ratio(target, text))
+
+    @staticmethod
+    def location_mentioned(location: str, finding: Finding) -> bool:
+        """Whether the record mentions the user-entered location (any part of
+        "Salford, Manchester") as a whole word — in its title, description,
+        URL (e.g. /greater-manchester-news/) or structured location."""
+        parts = [p.strip().lower() for p in re.split(r"[,/;]", location) if p.strip()]
+        if not parts:
+            return False
+        url = re.sub(r"[^a-z0-9]+", " ", (finding.url or "").lower())
+        text = " ".join(
+            [
+                normalise_text(f"{finding.title} {finding.description or ''}"),
+                normalise_text(finding.location or ""),
+                url,
+            ]
+        )
+        text = re.sub(r"[^\w\s]", " ", text)
+        for part in parts:
+            words = re.sub(r"[^\w\s]", " ", part).split()
+            if words and re.search(r"(?<!\w)" + r"\s+".join(map(re.escape, words)) + r"(?!\w)",
+                                   text):
+                return True
+        return False
 
     def text_dob_evidence(
         self, subject: SearchSubject, finding: Finding
@@ -225,6 +262,18 @@ class IdentityMatcher:
                 score = float(self.config.scores.get("country_match", 100))
             signals.append((weights.get("country", 0.20), score))
 
+        # DOB / country corroboration, before the (weaker) location signal.
+        strongly_corroborated = len(signals) > 1
+
+        # The town/city the user entered, mentioned by the record: lifts local
+        # results above namesakes elsewhere. Only ever adds evidence — a
+        # record that doesn't mention the location is not penalised.
+        location_match = bool(subject.location) and self.location_mentioned(
+            subject.location, finding
+        )
+        if location_match:
+            signals.append((weights.get("location", 0.20), 100.0))
+
         total_weight = sum(w for w, _ in signals)
         if total_weight == 0:
             return 0.0
@@ -232,19 +281,24 @@ class IdentityMatcher:
 
         # Uncorroborated matches are capped: a name alone (however similar)
         # never proves identity, and a mere text mention proves even less.
-        corroborated = len(signals) > 1
-        if not corroborated:
-            confidence = min(confidence, self.config.name_only_cap)
+        if not strongly_corroborated:
+            confidence = min(
+                confidence,
+                self.config.location_corroborated_cap if location_match
+                else self.config.name_only_cap,
+            )
         if not finding.subject_name:
             # A DOB printed in the record lifts a text mention well above the
             # plain-mention ceiling: formal records rarely print a DOB that
-            # isn't the named person's.
+            # isn't the named person's. A matching location lifts it a little.
             if text_dob == dob_evidence.EXACT:
                 mention_cap = self.config.dob_in_text_cap
             elif text_dob in (dob_evidence.YEAR, dob_evidence.AGE):
                 mention_cap = self.config.partial_dob_in_text_cap
             else:
                 mention_cap = self.config.mention_cap
+            if location_match:
+                mention_cap = max(mention_cap, self.config.location_in_text_cap)
             confidence = min(confidence, mention_cap)
         if dob_mismatch:
             confidence = min(confidence, self.config.dob_mismatch_cap)

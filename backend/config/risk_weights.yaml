@@ -29,11 +29,19 @@ keyword_escalation_categories:
 
 # Findings below this identity-match confidence (%) are excluded from scoring.
 confidence_threshold: 40
+# Higher bar for web / news / social-media mentions (the categories above):
+# a bare name mention scores 55% and is often a namesake, so it is shown and
+# flagged but does not move the score unless corroborated (DOB, age, or the
+# searched location — which lift it to 65-90%).
+media_confidence_threshold: 60
 
 # Overall score = strongest weighted finding + secondary_factor * sum of the
-# rest, capped at `cap`. Each finding's weighted score = weight * confidence%.
+# next `max_supporting` findings, capped at `cap`. Each finding's weighted
+# score = weight * confidence%. Limiting supporting findings stops a pile of
+# weak results from adding up to Critical on their own.
 aggregation:
   secondary_factor: 0.25
+  max_supporting: 5
   cap: 100
 
 # Risk level thresholds (score >= value).

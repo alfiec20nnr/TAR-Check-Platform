@@ -16,6 +16,7 @@ provider applies the same rules:
 """
 
 import functools
+import html
 import re
 import unicodedata
 from pathlib import Path
@@ -43,20 +44,52 @@ def query_names(full_name: str, matching_config_path: Path) -> list[str]:
     return [full_name, *expand_full_name(full_name, matching_config_path)]
 
 
+def clean_snippet(text: str) -> str:
+    """Search-API snippet as plain text: decode HTML entities (Brave sends
+    O'Neill as "O&#x27;Neill") and drop markup (it wraps hits in <strong>)."""
+    text = re.sub(r"<[^>]+>", "", html.unescape(text or ""))
+    return " ".join(html.unescape(text).split())
+
+
 def _normalise_text(text: str) -> str:
     """Lowercase, strip HTML tags (Brave wraps hits in <strong>) and accents,
     and reduce punctuation to spaces — keeping the commas, apostrophes,
     hyphens and full stops that name forms rely on."""
-    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"<[^>]+>", " ", html.unescape(text))
     text = unicodedata.normalize("NFKD", text)
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
-    text = re.sub(r"[^\w\s,'.-]", " ", text.lower())
+    text = re.sub(r"[^\w\s,'.-]", " ", text.lower().replace("’", "'"))
     return " ".join(text.split())
+
+
+# Irish/Scottish surname prefixes written several ways: O'Neill, O Neill,
+# O-Neill, O’Neill, ONeill (and Mc). Joined into one word so they compare
+# equal. "Mac" is only joined across an apostrophe — "Mac" followed by a
+# space is too often an unrelated word.
+_PARTICLE_RE = re.compile(r"(?<![\w'-])(o|mc)(?:'\s*|\s+|-)(?=[a-z])|(?<![\w'-])(mac)'(?=[a-z])")
+
+
+def compact_name_particles(text: str) -> str:
+    """Join surname prefixes to their surname ("o neill" -> "oneill").
+    Expects lowercase text."""
+    return _PARTICLE_RE.sub(lambda m: m.group(1) or m.group(2), text)
+
+
+def normalise_for_names(text: str) -> str:
+    """Text normalised for name matching (see :func:`mentions_subject`)."""
+    return compact_name_particles(_normalise_text(text))
+
+
+def _token_regex(token: str) -> str:
+    """A name token that tolerates single/double letter spellings:
+    Neil = Neill, Philip = Phillip, Jon = Jonn."""
+    token = re.sub(r"(.)\1+", r"\1", token)
+    return "".join(re.escape(ch) + ("{1,2}" if ch.isalpha() else "") for ch in token)
 
 
 @functools.lru_cache(maxsize=64)
 def _name_pattern(subject_name: str) -> re.Pattern[str] | None:
-    tokens = [re.escape(t.strip(".,")) for t in _normalise_text(subject_name).split()]
+    tokens = [_token_regex(t.strip(".,")) for t in normalise_for_names(subject_name).split()]
     tokens = [t for t in tokens if t]
     if not tokens:
         return None
@@ -77,7 +110,7 @@ def mentions_subject(subject_name: str, text: str) -> bool:
     name, not just both words appearing somewhere. Results that fail this are
     about someone else (or no one) and are discarded."""
     pattern = _name_pattern(subject_name)
-    return bool(pattern and pattern.search(_normalise_text(text)))
+    return bool(pattern and pattern.search(normalise_for_names(text)))
 
 
 def on_site(url: str, site: str) -> bool:

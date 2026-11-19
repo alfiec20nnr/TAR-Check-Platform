@@ -538,6 +538,36 @@ def test_mentions_subject_requires_the_name_itself(text, expected):
     assert mentions_subject("Test Person", text) is expected
 
 
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        # Real headline forms for a search typed as "Sam O Neil":
+        ("Drugs gang jailed: when one of the gang, Sam O'Neill, was arrested", True),
+        ("Sam O’Neill described in court as a 'jolly big man'", True),
+        ("Sam ONeill appointments", True),
+        ("Sam O-Neil profile", True),
+        ("Sam O Neil, 34, of Salford", True),
+        ("O'Neill, Sam — director", True),
+        # Exactly as Brave returns it — the apostrophe HTML-encoded:
+        ("When one of the gang, Sam O&#x27;Neill, was arrested", True),
+        # A different surname must no longer match via the "O":
+        ("Sam Neil - Director at SK Accountancy", False),
+        ("Samuel Neil fighter profile", False),
+    ],
+)
+def test_mentions_subject_handles_surname_prefixes_and_spelling(text, expected):
+    from app.connectors.web_common import mentions_subject
+
+    assert mentions_subject("Sam O Neil", text) is expected
+
+
+def test_mentions_subject_tolerates_double_letters():
+    from app.connectors.web_common import mentions_subject
+
+    assert mentions_subject("Philip McDonald", "Phillip Mc Donald jailed")
+    assert mentions_subject("Sam O'Neill", "Sam O Neil fined")
+
+
 @respx.mock
 async def test_news_api_restricted_to_uk_papers_and_filters_other_people():
     from app.connectors.news_api import NewsApiConnector

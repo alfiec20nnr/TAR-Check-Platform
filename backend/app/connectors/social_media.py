@@ -73,8 +73,8 @@ class SocialMediaConnector(BaseConnector):
                 if not link or link in seen_links or not web_common.on_site(link, site):
                     continue
                 seen_links.add(link)
-                title = item.get("title", "Untitled result")
-                description = item.get("description") or ""
+                title = web_common.clean_snippet(item.get("title", "")) or "Untitled result"
+                description = web_common.clean_snippet(item.get("description") or "")
                 text = f"{title} {description}"
                 # Same rule as the web connectors: a post/profile only
                 # *mentions* a name — subject_name stays unset so identity

@@ -107,12 +107,13 @@ def _stated_ages(text: str, subject_name: str | None) -> list[int]:
     ages = [int(a) for a in _AGED_RE.findall(text)]
     if subject_name:
         # Court/police reporting style: "John Smith, 49, of Leeds".
-        from app.connectors.web_common import _name_pattern
+        from app.connectors.web_common import _name_pattern, normalise_for_names
 
         pattern = _name_pattern(subject_name)
         if pattern:
-            for m in pattern.finditer(text):
-                after = re.match(r"\s*,\s*(\d{1,3})\b", text[m.end():])
+            named = normalise_for_names(text)
+            for m in pattern.finditer(named):
+                after = re.match(r"\s*,\s*(\d{1,3})\b", named[m.end():])
                 if after:
                     ages.append(int(after.group(1)))
     return [a for a in ages if 0 < a < 120]

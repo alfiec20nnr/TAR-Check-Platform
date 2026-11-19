@@ -224,8 +224,8 @@ class BraveSearchConnector(BaseConnector):
             if link and link in seen_links:
                 continue
             seen_links.add(link)
-            title = item.get("title", "Untitled result")
-            description = item.get("description") or ""
+            title = web_common.clean_snippet(item.get("title", "")) or "Untitled result"
+            description = web_common.clean_snippet(item.get("description") or "")
             text = f"{title} {description}"
             # Web pages only *mention* a name — subject_name is deliberately
             # left unset so identity matching treats this as an unstructured

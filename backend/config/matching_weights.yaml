@@ -5,6 +5,9 @@ weights:
   name: 0.55
   date_of_birth: 0.25
   country: 0.20
+  # The town/city entered on the search, mentioned by the record. Only ever
+  # adds evidence; records that don't mention it are not penalised.
+  location: 0.20
 
 # Score awarded per signal outcome (0-100 scale).
 scores:
@@ -38,6 +41,12 @@ caps:
   dob_in_text: 90
   # ... or a matching birth year/month, or a stated age that fits the DOB:
   partial_dob_in_text: 65
+  # Text-only record that also mentions the searched location (e.g. a
+  # Manchester news story for a Manchester search) — ranks local results
+  # above namesakes elsewhere:
+  location_in_text: 70
+  # Structured record whose only corroboration is the location:
+  location_corroborated: 75
 
 # Records scoring below this confidence are discarded before they are stored
 # or reported — they are almost certainly a different person (conflicting

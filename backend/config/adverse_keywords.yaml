@@ -109,7 +109,6 @@ tiers:
         - murder*
         - manslaughter
         - homicide
-        - killed
         - killing*
         - killer*
         - stab
@@ -117,7 +116,9 @@ tiers:
         - stabbing*
         - shooting*
         - shot dead
-        - assault*
+        - common assault
+        - assault by beating
+        - assault charge*
         - grievous bodily harm
         - gbh
         - actual bodily harm
@@ -307,7 +308,6 @@ tiers:
         - detained
         - detention
         - incarcerat*
-        - custody
         - acquitted
         - acquittal
       sanctions_regulatory:
@@ -370,6 +370,9 @@ tiers:
         - accusation*
         - complaint*
         - charges
+        - custody
+        - assault*
+        - killed
         - warning
       regulatory:
         - fine

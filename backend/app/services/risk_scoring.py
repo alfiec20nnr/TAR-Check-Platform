@@ -38,6 +38,11 @@ class RiskConfig:
     secondary_factor: float
     cap: float
     thresholds: dict[str, float]
+    # Media-type findings (web/news/social mentions) must clear a higher bar
+    # than structured records before they move the score.
+    media_confidence_threshold: float = 60.0
+    # Only this many supporting findings (after the strongest) add to the score.
+    max_supporting: int = 5
 
     @classmethod
     def load(cls, path: Path) -> "RiskConfig":
@@ -52,6 +57,10 @@ class RiskConfig:
             confidence_threshold=float(data.get("confidence_threshold", 40)),
             secondary_factor=float(agg.get("secondary_factor", 0.25)),
             cap=float(agg.get("cap", 100)),
+            media_confidence_threshold=float(
+                data.get("media_confidence_threshold", data.get("confidence_threshold", 40))
+            ),
+            max_supporting=int(agg.get("max_supporting", 5)),
             thresholds=data.get("thresholds", {"low": 0, "medium": 25, "high": 50,
                                                "critical": 80}),
         )
@@ -88,7 +97,7 @@ class RiskScorer:
     def assess(self, findings_with_confidence: list[tuple[Finding, float]]) -> RiskAssessment:
         scored: list[ScoredFinding] = []
         for finding, confidence in findings_with_confidence:
-            if confidence < self.config.confidence_threshold:
+            if confidence < self.threshold_for(finding):
                 continue
             weight, escalated = self._weight_for(finding)
             scored.append(
@@ -105,7 +114,7 @@ class RiskScorer:
             return RiskAssessment(score=0.0, level="low", factors=[])
 
         scored.sort(key=lambda s: s.weighted_score, reverse=True)
-        primary, rest = scored[0], scored[1:]
+        primary, rest = scored[0], scored[1 : 1 + self.config.max_supporting]
         score = primary.weighted_score + self.config.secondary_factor * sum(
             s.weighted_score for s in rest
         )
@@ -125,6 +134,15 @@ class RiskScorer:
         ]
         return RiskAssessment(score=score, level=self.level_for(score), factors=factors)
 
+    def threshold_for(self, finding: Finding) -> float:
+        """Minimum identity-match confidence for `finding` to count towards
+        the score: higher for web/news/social mentions, which are often about
+        a namesake, than for structured records."""
+        if finding.category in self.config.escalate_categories:
+            return max(self.config.confidence_threshold,
+                       self.config.media_confidence_threshold)
+        return self.config.confidence_threshold
+
     def level_for(self, score: float) -> str:
         thresholds = self.config.thresholds
         level = "low"
@@ -135,7 +153,7 @@ class RiskScorer:
 
     def per_finding_contribution(self, finding: Finding, confidence: float) -> float:
         """Standalone weighted score for a single finding (stored per result)."""
-        if confidence < self.config.confidence_threshold:
+        if confidence < self.threshold_for(finding):
             return 0.0
         weight, _ = self._weight_for(finding)
         return round(weight * confidence / 100.0, 1)

@@ -77,8 +77,8 @@ class UkNewspapersConnector(BaseConnector):
             if outlet is None:
                 continue  # provider noise from outside the UK press list
             seen_links.add(link)
-            title = item.get("title", "Untitled article")
-            description = item.get("description") or ""
+            title = web_common.clean_snippet(item.get("title", "")) or "Untitled article"
+            description = web_common.clean_snippet(item.get("description") or "")
             text = f"{title} {description}"
             # Articles only *mention* a name — subject_name stays unset so
             # identity matching applies its unstructured-mention ceiling.

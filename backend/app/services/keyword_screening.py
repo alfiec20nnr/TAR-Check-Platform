@@ -12,6 +12,7 @@ valuable one. A hit:
 """
 
 import functools
+import html
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -48,7 +49,7 @@ class KeywordHits:
 def normalise_text(text: str) -> str:
     """Lowercase, strip HTML tags (search APIs wrap hits in <strong>) and
     accents, collapse whitespace."""
-    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"<[^>]+>", " ", html.unescape(text))
     text = unicodedata.normalize("NFKD", text)
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
     return " ".join(text.lower().replace("’", "'").split())

@@ -135,6 +135,20 @@ against a broad list of terms (`backend/config/adverse_keywords.yaml`, about
 in the UI and report, and they turn neutral web or social results into adverse
 media. Results are never discarded for lacking a keyword.
 
+**Name matching** handles surname prefixes and spelling: O'Neill, O Neill,
+O’Neill and ONeill all match (likewise Mc), and single/double letters are
+tolerated (Neil = Neill). Search-API snippets are HTML-decoded first; Brave
+sends apostrophes as `&#x27;`.
+
+**Location:** a result that mentions the town/city entered on the search (in
+its text or URL) has its confidence raised to 70%, so local coverage ranks
+above namesakes elsewhere. Results that don't mention it are not penalised.
+
+**Risk score:** web, news and social mentions only count towards the score at
+60%+ confidence. This means corroborated by location, date of birth or age. A
+bare name mention (55%) is shown and flagged but not scored. Only the
+strongest finding plus the next 5 add to the score (`risk_weights.yaml`).
+
 **Date of birth in record text:** if a DOB is given, records without a
 structured DOB (court/police reports, Gazette notices, news) are checked for
 it. If the record prints the subject's DOB, the result is marked "DOB ✓" and
