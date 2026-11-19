@@ -10,6 +10,8 @@ weights:
 scores:
   dob_exact: 100
   dob_year_only: 60
+  # Record states an age ("John Smith, 49,") that fits the DOB at its date.
+  dob_age_match: 60
   country_match: 100
 
 # A hard DOB mismatch caps overall confidence at this value — two different
@@ -30,6 +32,12 @@ caps:
   # Kept below the risk-scoring threshold: this is almost certainly a
   # different person.
   name_conflict: 35
+  # Text-only record (web page, news/court report, Gazette notice) whose text
+  # prints the subject's full date of birth — strong corroboration for
+  # police/court/formal records:
+  dob_in_text: 90
+  # ... or a matching birth year/month, or a stated age that fits the DOB:
+  partial_dob_in_text: 65
 
 # Records scoring below this confidence are discarded before they are stored
 # or reported — they are almost certainly a different person (conflicting

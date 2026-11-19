@@ -125,6 +125,8 @@ class Settings(BaseSettings):
     # Config files (tunable without code changes)
     risk_config_path: Path = Field(default=BASE_DIR / "config" / "risk_weights.yaml")
     matching_config_path: Path = Field(default=BASE_DIR / "config" / "matching_weights.yaml")
+    # Broad adverse-keyword list screened against every finding.
+    adverse_keywords_path: Path = Field(default=BASE_DIR / "config" / "adverse_keywords.yaml")
 
     @property
     def cors_origin_list(self) -> list[str]:

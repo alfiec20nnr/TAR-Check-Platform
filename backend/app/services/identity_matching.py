@@ -17,6 +17,7 @@ import yaml
 from rapidfuzz import fuzz
 
 from app.connectors.base import Finding, SearchSubject
+from app.services import dob_evidence
 
 
 @dataclass
@@ -29,6 +30,10 @@ class MatchingConfig:
     name_conflict_cap: float
     name_variants: dict[str, list[str]]
     discard_below: float = 40.0
+    # Ceilings for text-only records (no structured name) whose text carries
+    # date-of-birth evidence — see services/dob_evidence.py.
+    dob_in_text_cap: float = 90.0
+    partial_dob_in_text_cap: float = 65.0
 
     @classmethod
     def load(cls, path: Path) -> "MatchingConfig":
@@ -43,6 +48,8 @@ class MatchingConfig:
             name_conflict_cap=float(caps.get("name_conflict", 35)),
             name_variants=data.get("name_variants", {}),
             discard_below=float(data.get("discard_below", 40)),
+            dob_in_text_cap=float(caps.get("dob_in_text", 90)),
+            partial_dob_in_text_cap=float(caps.get("partial_dob_in_text", 65)),
         )
 
 
@@ -161,6 +168,21 @@ class IdentityMatcher:
         # and stays low otherwise; partial_ratio is too noisy for short names.
         return float(fuzz.token_set_ratio(target, text))
 
+    def text_dob_evidence(
+        self, subject: SearchSubject, finding: Finding
+    ) -> dob_evidence.DobEvidence:
+        """DOB evidence read from the record's text, for records that carry no
+        structured date of birth (police/court reports, Gazette notices, news,
+        web pages). Only meaningful when the user supplied a DOB."""
+        if not subject.date_of_birth or finding.date_of_birth:
+            return dob_evidence.DobEvidence(None)
+        return dob_evidence.assess(
+            f"{finding.title} {finding.description or ''}",
+            subject.date_of_birth,
+            record_date=finding.date,
+            subject_name=subject.full_name,
+        )
+
     # -- overall ----------------------------------------------------------------
 
     def confidence(self, subject: SearchSubject, finding: Finding) -> float:
@@ -185,6 +207,18 @@ class IdentityMatcher:
                 score = float(self.config.scores.get("dob_year_only", 60))
             signals.append((weights.get("date_of_birth", 0.25), score))
 
+        # No structured DOB: look for one (or a stated age) in the text.
+        text_dob = self.text_dob_evidence(subject, finding).status
+        dob_weight = weights.get("date_of_birth", 0.25)
+        if text_dob == dob_evidence.EXACT:
+            signals.append((dob_weight, float(self.config.scores.get("dob_exact", 100))))
+        elif text_dob == dob_evidence.YEAR:
+            signals.append((dob_weight, float(self.config.scores.get("dob_year_only", 60))))
+        elif text_dob == dob_evidence.AGE:
+            signals.append((dob_weight, float(self.config.scores.get("dob_age_match", 60))))
+        elif text_dob == dob_evidence.CONFLICT:
+            dob_mismatch = True
+
         if subject.country and finding.location:
             score = self.country_score(subject.country, finding.location)
             if score == 100.0:
@@ -202,7 +236,16 @@ class IdentityMatcher:
         if not corroborated:
             confidence = min(confidence, self.config.name_only_cap)
         if not finding.subject_name:
-            confidence = min(confidence, self.config.mention_cap)
+            # A DOB printed in the record lifts a text mention well above the
+            # plain-mention ceiling: formal records rarely print a DOB that
+            # isn't the named person's.
+            if text_dob == dob_evidence.EXACT:
+                mention_cap = self.config.dob_in_text_cap
+            elif text_dob in (dob_evidence.YEAR, dob_evidence.AGE):
+                mention_cap = self.config.partial_dob_in_text_cap
+            else:
+                mention_cap = self.config.mention_cap
+            confidence = min(confidence, mention_cap)
         if dob_mismatch:
             confidence = min(confidence, self.config.dob_mismatch_cap)
         return round(confidence, 1)

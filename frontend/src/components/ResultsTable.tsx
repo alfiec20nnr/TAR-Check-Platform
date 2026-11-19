@@ -2,6 +2,7 @@ import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import {
   Box,
   Chip,
+  FormControlLabel,
   IconButton,
   Link,
   MenuItem,
@@ -14,6 +15,7 @@ import {
   TablePagination,
   TableRow,
   TableSortLabel,
+  Switch,
   TextField,
   Tooltip,
   Typography,
@@ -70,6 +72,8 @@ function matchBand(confidence: number): {
 export default function ResultsTable({ results }: { results: SearchResultOut[] }) {
   const [filterText, setFilterText] = useState("");
   const [category, setCategory] = useState("all");
+  const [flaggedOnly, setFlaggedOnly] = useState(false);
+  const flaggedCount = results.filter((r) => (r.flagged_terms ?? []).length > 0).length;
   const [sortKey, setSortKey] = useState<SortKey>("risk_contribution");
   const [sortAsc, setSortAsc] = useState(false);
   const [page, setPage] = useState(0);
@@ -85,6 +89,7 @@ export default function ResultsTable({ results }: { results: SearchResultOut[] }
     const rows = results.filter(
       (r) =>
         (category === "all" || r.category === category) &&
+        (!flaggedOnly || (r.flagged_terms ?? []).length > 0) &&
         (!text ||
           r.title.toLowerCase().includes(text) ||
           (r.description ?? "").toLowerCase().includes(text) ||
@@ -97,7 +102,7 @@ export default function ResultsTable({ results }: { results: SearchResultOut[] }
       return sortAsc ? cmp : -cmp;
     });
     return rows;
-  }, [results, filterText, category, sortKey, sortAsc]);
+  }, [results, filterText, category, flaggedOnly, sortKey, sortAsc]);
 
   const paged = filtered.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
 
@@ -148,6 +153,18 @@ export default function ResultsTable({ results }: { results: SearchResultOut[] }
             </MenuItem>
           ))}
         </TextField>
+        <FormControlLabel
+          control={
+            <Switch
+              checked={flaggedOnly}
+              onChange={(e) => {
+                setFlaggedOnly(e.target.checked);
+                setPage(0);
+              }}
+            />
+          }
+          label={`Flagged keywords only (${flaggedCount})`}
+        />
       </Box>
       <TableContainer>
         <Table size="small" aria-label="search results">
@@ -174,6 +191,13 @@ export default function ResultsTable({ results }: { results: SearchResultOut[] }
                       {r.description}
                     </Typography>
                   )}
+                  {(r.flagged_terms ?? []).length > 0 && (
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 0.5 }}>
+                      {r.flagged_terms.map((t) => (
+                        <Chip key={t} size="small" color="error" variant="outlined" label={t} />
+                      ))}
+                    </Box>
+                  )}
                 </TableCell>
                 <TableCell>{r.source_name}</TableCell>
                 <TableCell>
@@ -198,6 +222,21 @@ export default function ResultsTable({ results }: { results: SearchResultOut[] }
                         label={matchBand(r.confidence).label}
                       />
                     </Tooltip>
+                    {r.dob_check && (
+                      <Tooltip
+                        title={
+                          r.dob_check === "exact"
+                            ? "The subject's date of birth appears in this record"
+                            : "Birth year or stated age in this record fits the date of birth"
+                        }
+                      >
+                        <Chip
+                          size="small"
+                          color={r.dob_check === "exact" ? "success" : "info"}
+                          label={r.dob_check === "exact" ? "DOB ✓" : "Age ✓"}
+                        />
+                      </Tooltip>
+                    )}
                   </Box>
                 </TableCell>
                 <TableCell align="right">{r.risk_contribution}</TableCell>

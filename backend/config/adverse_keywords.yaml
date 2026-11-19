@@ -1,0 +1,536 @@
+# Adverse-keyword screening list — applied to EVERY finding from EVERY source.
+#
+# The list is deliberately broad: it is better to flag an irrelevant result
+# than to miss a valuable one. A keyword hit never discards anything; it
+#   - flags the finding with the matched terms (shown in the UI and report),
+#   - re-categorises neutral web / social-media results as adverse media, and
+#   - escalates media-type findings to the tier's risk weight below.
+#
+# Matching rules (case-insensitive, accents and HTML stripped):
+#   - a term matches whole words only: "ban" matches "ban"/"bans", not "bank"
+#   - a trailing "*" matches any word ending: "fraud*" -> fraudster, fraudulent
+#   - plain terms also match a simple plural (+s / +es)
+#   - spaces in a phrase also match hyphens: "drink driving" -> "drink-driving"
+#
+# Edit freely — no code changes needed. Groups are only for readability and
+# for showing *why* a result was flagged.
+
+tiers:
+  # Serious adverse media (risk weight 60): crime, prosecution, sanctions.
+  serious:
+    weight: 60
+    groups:
+      financial_crime:
+        - fraud*
+        - defraud*
+        - money laundering
+        - launder*
+        - bribe*
+        - bribery
+        - corrupt*
+        - embezzl*
+        - misappropriat*
+        - insider trading
+        - insider dealing
+        - market manipulation
+        - market abuse
+        - ponzi
+        - pyramid scheme
+        - scam*
+        - con man
+        - conman
+        - con artist
+        - swindl*
+        - extort*
+        - blackmail*
+        - racketeer*
+        - kickback*
+        - bid rigging
+        - price fixing
+        - cartel*
+        - tax evasion
+        - tax fraud
+        - vat fraud
+        - carousel fraud
+        - benefit fraud
+        - benefits fraud
+        - mortgage fraud
+        - insurance fraud
+        - identity theft
+        - identity fraud
+        - wire fraud
+        - securities fraud
+        - accounting fraud
+        - false accounting
+        - forger*
+        - forged
+        - counterfeit*
+        - smuggl*
+        - illicit finance
+        - illicit enrichment
+        - proceeds of crime
+        - confiscation order
+        - freezing order
+        - unexplained wealth order
+        - asset freeze
+        - asset seizure
+        - assets frozen
+        - terrorist financing
+        - sanctions evasion
+        - sanctions breach
+        - sanctions violation
+        - embargo violation
+        - export control violation
+        - theft
+        - thief
+        - thieves
+        - stole
+        - stolen
+        - steal*
+        - burglar*
+        - robbery
+        - robber*
+        - robbed
+        - shoplift*
+        - handling stolen goods
+        - phishing
+        - ransomware
+        - hacker*
+        - hacking
+        - cybercrime
+        - cyber crime
+        - cyber fraud
+        - computer misuse
+        - data theft
+      violence:
+        - murder*
+        - manslaughter
+        - homicide
+        - killed
+        - killing*
+        - killer*
+        - stab
+        - stabbed
+        - stabbing*
+        - shooting*
+        - shot dead
+        - assault*
+        - grievous bodily harm
+        - gbh
+        - actual bodily harm
+        - abh
+        - wounding
+        - affray
+        - violent disorder
+        - riot*
+        - kidnap*
+        - abduct*
+        - hostage*
+        - false imprisonment
+        - tortur*
+        - domestic abuse
+        - domestic violence
+        - coercive control
+        - coercive and controlling
+        - stalking
+        - stalker*
+        - threats to kill
+        - arson*
+        - firebomb*
+        - acid attack*
+        - attempted murder
+        - death by dangerous driving
+      sexual_offences:
+        - rape
+        - raped
+        - raping
+        - rapist*
+        - sexual assault*
+        - sexually assault*
+        - sexual abuse
+        - sexually abus*
+        - sex offender*
+        - sex offence*
+        - sexual offence*
+        - sex offenders register
+        - sexual harm prevention order
+        - indecent*
+        - indecency
+        - child abuse
+        - child sexual
+        - paedophil*
+        - pedophil*
+        - grooming
+        - groomed
+        - child exploitation
+        - voyeur*
+        - upskirt*
+        - revenge porn
+        - sextortion
+        - exposure offence
+        - indecent exposure
+        - indecent images
+      drugs:
+        - drug*
+        - narcotic*
+        - cocaine
+        - crack cocaine
+        - heroin
+        - cannabis
+        - marijuana
+        - methamphetamine
+        - crystal meth
+        - meth
+        - ecstasy
+        - mdma
+        - ketamine
+        - fentanyl
+        - amphetamine*
+        - opium
+        - opioid*
+        - spice
+        - controlled substance*
+        - class a
+        - class b
+        - possession with intent
+        - intent to supply
+        - supplying
+        - county lines
+        - cannabis farm*
+        - cultivation of cannabis
+        - drug dealer*
+        - dealing drugs
+        - drug trafficking
+        - drug driving
+      weapons:
+        - firearm*
+        - gun
+        - guns
+        - gunman
+        - gunmen
+        - gunpoint
+        - weapon*
+        - knife
+        - knives
+        - knife crime
+        - knifepoint
+        - machete*
+        - bladed article*
+        - offensive weapon*
+        - ammunition
+        - explosive*
+        - bomb
+        - bombs
+        - bomber*
+        - bombing*
+        - imitation firearm*
+      terrorism_extremism:
+        - terror*
+        - extremis*
+        - radicalis*
+        - radicaliz*
+        - jihad*
+        - isis
+        - isil
+        - al qaeda
+        - al-qaeda
+        - proscribed organisation*
+        - proscribed group*
+        - neo nazi*
+        - neo-nazi*
+        - white supremac*
+        - hate crime*
+      human_exploitation:
+        - trafficking
+        - trafficker*
+        - trafficked
+        - human trafficking
+        - people smuggling
+        - people smuggler*
+        - modern slavery
+        - slavery
+        - forced labour
+        - forced labor
+        - child labour
+        - organ trafficking
+        - exploitation
+      criminal_justice:
+        - arrest*
+        - charged
+        - convict*
+        - conviction*
+        - guilty
+        - pleaded guilty
+        - pled guilty
+        - found guilty
+        - sentenced
+        - sentencing
+        - jail*
+        - prison*
+        - imprison*
+        - custodial sentence
+        - suspended sentence
+        - remanded
+        - remand in custody
+        - prosecut*
+        - indict*
+        - criminal*
+        - criminal record
+        - offender*
+        - crown court
+        - magistrates court
+        - magistrates' court
+        - old bailey
+        - court martial
+        - wanted by police
+        - manhunt
+        - warrant
+        - arrest warrant
+        - extradit*
+        - fugitive*
+        - absconded
+        - on the run
+        - parole
+        - probation
+        - community order
+        - restraining order
+        - crown prosecution service
+        - serious fraud office
+        - national crime agency
+        - interpol
+        - europol
+        - fbi
+        - detained
+        - detention
+        - incarcerat*
+        - custody
+        - acquitted
+        - acquittal
+      sanctions_regulatory:
+        - sanctioned
+        - sanctions list
+        - designated person
+        - ofsi
+        - disqualified
+        - disqualification*
+        - struck off
+        - prohibition order*
+        - prohibited from
+        - debarred
+        - barred from
+        - banned
+        - ban
+        - enforcement action
+        - politically exposed
+        - pep
+
+  # General negative media (risk weight 20): disputes, misconduct, insolvency,
+  # dishonesty, conduct and anything else worth a human look.
+  general:
+    weight: 20
+    groups:
+      legal_disputes:
+        - lawsuit*
+        - sued
+        - suing
+        - litigation
+        - legal action
+        - court case*
+        - court hearing*
+        - tribunal*
+        - employment tribunal
+        - injunction*
+        - judgment against
+        - default judgment
+        - claim against
+        - high court
+        - county court
+        - court of appeal
+        - appeal*
+        - settlement
+        - damages
+        - libel
+        - defamation
+        - slander
+        - police
+        - inquest
+        - inquiry
+        - probe
+        - raid
+        - raided
+        - investigat*
+        - allegation*
+        - alleged*
+        - allegedly
+        - accused
+        - accusation*
+        - complaint*
+        - charges
+        - warning
+      regulatory:
+        - fine
+        - fined
+        - penalty
+        - penalties
+        - censure*
+        - reprimand*
+        - regulator*
+        - fca
+        - financial conduct authority
+        - sra
+        - hmrc
+        - breach*
+        - breached
+        - non compliance
+        - non-compliance
+        - compliance failure*
+        - unlicensed
+        - unauthorised
+        - unauthorized
+        - illegal*
+        - unlawful*
+        - suspended
+        - suspension
+        - dismissed
+        - sacked
+        - fired
+        - resigned
+        - resignation
+      insolvency_debt:
+        - bankrupt*
+        - insolven*
+        - liquidat*
+        - receivership
+        - administrator*
+        - entered administration
+        - went into administration
+        - winding up
+        - winding-up
+        - wound up
+        - ccj
+        - county court judgment*
+        - county court judgement*
+        - debt relief order
+        - iva
+        - individual voluntary arrangement
+        - creditor*
+        - unpaid debt*
+        - debt*
+        - defaulted
+        - arrears
+        - repossess*
+        - evict*
+        - phoenix company
+        - phoenixing
+        - dissolved
+        - collapsed
+        - collapse
+      dishonesty_misconduct:
+        - liar*
+        - lie
+        - lied
+        - lying
+        - deceit*
+        - deceiv*
+        - decept*
+        - dishonest*
+        - mislead*
+        - misled
+        - misrepresent*
+        - false claim*
+        - fake*
+        - fabricat*
+        - falsif*
+        - cheat*
+        - manipulat*
+        - exploit*
+        - abuse*
+        - abusing
+        - abusive
+        - victim*
+        - misconduct
+        - gross misconduct
+        - malpractice
+        - negligen*
+        - wrongdoing
+        - impropriety
+        - improper*
+        - unethical
+        - breach of trust
+        - breach of duty
+        - conflict of interest
+        - cover up
+        - cover-up
+        - whistleblow*
+        - scandal*
+        - controvers*
+        - disgrace*
+        - shame*
+        - exposed
+        - expose
+        - rogue*
+        - cowboy*
+        - unpaid
+        - owed
+        - left out of pocket
+      conduct_hate:
+        - racis*
+        - racial abuse
+        - racially aggravated
+        - sexis*
+        - homophob*
+        - transphob*
+        - misogyn*
+        - antisemit*
+        - anti-semit*
+        - islamophob*
+        - xenophob*
+        - bigot*
+        - slur*
+        - offensive
+        - hate speech
+        - hateful
+        - bully*
+        - bullied
+        - intimidat*
+        - threat*
+        - threaten*
+        - troll*
+        - doxx*
+        - harass*
+        - discriminat*
+        - violence
+        - violent
+        - attack*
+        - fight*
+        - brawl*
+      other_offences:
+        - vandal*
+        - criminal damage
+        - trespass*
+        - drink driving
+        - drink driver*
+        - drunk driving
+        - dangerous driving
+        - careless driving
+        - speeding
+        - driving ban
+        - banned from driving
+        - hit and run
+        - road rage
+        - public order
+        - anti-social behaviour
+        - antisocial behaviour
+        - asbo
+        - disorderly
+        - drunk and disorderly
+        - animal cruelty
+        - cruelty
+        - neglect*
+        - poaching
+        - wildlife crime
+        - fly tipping
+        - environmental crime
+        - pollution
+        - gambling
+        - addiction

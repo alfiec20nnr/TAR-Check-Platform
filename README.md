@@ -118,6 +118,30 @@ Set `MOCK_CONNECTORS=false` and provide keys in `.env`:
 
 Connectors without credentials are skipped gracefully; the rest still run.
 
+**Source priority** (order of `CONNECTOR_CLASSES` in
+`backend/app/connectors/registry.py`): 1. Brave Web Search, 2. UK Newspapers,
+3. News API, 4. DVLA, then Sanctions, Companies House, Insolvency, FCA, Social
+Media, Google. All sources run concurrently. Priority decides who gets the
+shared Brave rate limit first, which copy is kept when several sources return
+the same record, and the order sources are listed in.
+
+**Brave query plan:** full name → name + country → name + location →
+name + country + location → nickname variants. Every query's results are
+gathered first, then filtered to pages that name the subject.
+
+**Adverse-keyword screening:** every finding from every source is checked
+against a broad list of terms (`backend/config/adverse_keywords.yaml`, about
+500 terms: fraud, drugs, violence, prosecution and so on). Matches are flagged
+in the UI and report, and they turn neutral web or social results into adverse
+media. Results are never discarded for lacking a keyword.
+
+**Date of birth in record text:** if a DOB is given, records without a
+structured DOB (court/police reports, Gazette notices, news) are checked for
+it. If the record prints the subject's DOB, the result is marked "DOB ✓" and
+confidence goes up to 90%. A matching birth year or a stated age ("John Smith,
+49,") that fits the DOB is marked "Age ✓". A labelled DOB that differs causes
+the record to be discarded as someone else.
+
 Searching is UK-focused: Brave results are localised to the UK (`BRAVE_COUNTRY=GB`),
 and a search with no country is treated as United Kingdom (`DEFAULT_COUNTRY`).
 Web, news and social results are kept only when they actually name the subject
@@ -193,9 +217,11 @@ All ceilings are tunable in `backend/config/matching_weights.yaml`.
 
 ## Tuning without code changes
 
-- `backend/config/risk_weights.yaml` — category severity weights, adverse-media
-  keyword escalation, confidence threshold, aggregation, and Low/Medium/High/
-  Critical thresholds.
+- `backend/config/risk_weights.yaml` — category severity weights, which
+  categories keyword hits escalate, confidence threshold, aggregation, and
+  Low/Medium/High/Critical thresholds.
+- `backend/config/adverse_keywords.yaml` — the adverse-keyword list, in a
+  serious tier (weight 60) and a general tier (weight 20).
 - `backend/config/matching_weights.yaml` — identity-matching signal weights,
   confidence ceilings (`caps`), DOB-mismatch cap, and name-variant equivalences.
 

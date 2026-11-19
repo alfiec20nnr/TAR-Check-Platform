@@ -2,7 +2,8 @@
 
 Executes the full workflow for one search job:
 
-  connectors (concurrent) -> normalise -> deduplicate -> identity matching
+  connectors (concurrent, in priority order) -> normalise -> deduplicate
+  -> adverse-keyword screening (all sources) -> identity matching
   -> risk scoring -> AI summary -> report generation -> audit entry
 
 The pipeline owns its database session and always leaves the search in a
@@ -24,6 +25,7 @@ from app.services import audit, report_generator
 from app.services.ai_summary import AiSummariser
 from app.services.dedup import deduplicate
 from app.services.identity_matching import IdentityMatcher
+from app.services.keyword_screening import KeywordScreener
 from app.services.risk_scoring import RiskScorer
 
 logger = logging.getLogger(__name__)
@@ -90,12 +92,26 @@ async def _execute(session: AsyncSession, search: Search, settings: Settings) ->
     ]
 
     # 2-3. Normalise (already normalised by connectors) and deduplicate.
+    # Results arrive in connector priority order, so when the same record is
+    # returned by several sources the highest-priority source's copy is kept.
     findings = deduplicate(
         [f for r in connector_results for f in r.findings]
     )
 
+    # 3b. Screen every finding from every source against the broad adverse
+    # keyword list. Flags and re-categorises; never discards.
+    screener = KeywordScreener.from_path(settings.adverse_keywords_path)
+    flagged_count = sum(1 for f in findings if screener.flag(f))
+
     # 4-5. Identity matching → confidence per candidate record.
     matcher = IdentityMatcher.from_path(settings.matching_config_path)
+    # Record date-of-birth evidence found in record text (formal records,
+    # court/police reports) so the report can show what verified the match.
+    for f in findings:
+        evidence = matcher.text_dob_evidence(subject, f)
+        if evidence.status:
+            f.raw = {**(f.raw or {}), "dob_check": evidence.status,
+                     "dob_check_detail": evidence.detail}
     scored_findings = [(f, matcher.confidence(subject, f)) for f in findings]
     # Discard records that are not the person searched for (conflicting
     # forename, different date of birth) — they are never stored or reported.
@@ -103,7 +119,7 @@ async def _execute(session: AsyncSession, search: Search, settings: Settings) ->
     scored_findings = [(f, c) for f, c in scored_findings if matcher.is_subject(c)]
 
     # 6. Risk scoring.
-    scorer = RiskScorer.from_path(settings.risk_config_path)
+    scorer = RiskScorer.from_path(settings.risk_config_path, settings.adverse_keywords_path)
     assessment = scorer.assess(scored_findings)
 
     # Persist normalised results.
@@ -176,6 +192,8 @@ async def _execute(session: AsyncSession, search: Search, settings: Settings) ->
                 "url": row.url,
                 "event_date": row.event_date,
                 "confidence": row.confidence,
+                "flagged_terms": (row.raw or {}).get("flagged_terms", []),
+                "dob_check": (row.raw or {}).get("dob_check"),
             }
             for row in result_rows
         ],
@@ -212,6 +230,7 @@ async def _execute(session: AsyncSession, search: Search, settings: Settings) ->
             "duration_ms": duration_ms,
             "results_found": len(result_rows),
             "results_discarded": discarded_count,
+            "results_flagged": flagged_count,
             "risk_level": assessment.level,
             "report_reference": reference,
             "connector_stats": connector_stats,

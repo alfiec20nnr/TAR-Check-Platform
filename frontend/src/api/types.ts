@@ -47,6 +47,10 @@ export interface SearchResultOut {
   location: string | null;
   confidence: number;
   risk_contribution: number;
+  /** Adverse keywords found in the record. */
+  flagged_terms: string[];
+  /** Date-of-birth evidence found in the record text. */
+  dob_check: "exact" | "year" | "age" | null;
 }
 
 export interface SearchDetail extends SearchOut {

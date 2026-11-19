@@ -11,6 +11,7 @@ from pathlib import Path
 import yaml
 
 from app.connectors.base import Finding
+from app.services.keyword_screening import KeywordScreener, default_screener
 
 
 @dataclass
@@ -32,7 +33,7 @@ class RiskAssessment:
 @dataclass
 class RiskConfig:
     categories: dict[str, float]
-    media_keywords: dict
+    escalate_categories: set[str]
     confidence_threshold: float
     secondary_factor: float
     cap: float
@@ -44,7 +45,10 @@ class RiskConfig:
         agg = data.get("aggregation", {})
         return cls(
             categories=data.get("categories", {}),
-            media_keywords=data.get("media_keywords", {}),
+            escalate_categories=set(
+                data.get("keyword_escalation_categories", ["adverse_media", "web",
+                                                           "social_media"])
+            ),
             confidence_threshold=float(data.get("confidence_threshold", 40)),
             secondary_factor=float(agg.get("secondary_factor", 0.25)),
             cap=float(agg.get("cap", 100)),
@@ -59,24 +63,26 @@ def _load_config(path_str: str) -> RiskConfig:
 
 
 class RiskScorer:
-    def __init__(self, config: RiskConfig):
+    def __init__(self, config: RiskConfig, screener: KeywordScreener | None = None):
         self.config = config
+        self.screener = screener or default_screener()
 
     @classmethod
-    def from_path(cls, path: Path) -> "RiskScorer":
-        return cls(_load_config(str(path)))
+    def from_path(cls, path: Path, keywords_path: Path | None = None) -> "RiskScorer":
+        screener = KeywordScreener.from_path(keywords_path) if keywords_path else None
+        return cls(_load_config(str(path)), screener)
 
     def _weight_for(self, finding: Finding) -> tuple[float, bool]:
-        """Base severity weight for a finding, with adverse-media escalation."""
+        """Base severity weight for a finding, escalated for media-type findings
+        by the tier of the worst adverse keyword they contain
+        (config/adverse_keywords.yaml). Structured records (sanctions,
+        insolvency, …) keep their calibrated category weight."""
         weight = float(self.config.categories.get(finding.category, 5))
         escalated = False
-        if finding.category == "adverse_media":
-            text = f"{finding.title} {finding.description or ''}".lower()
-            for rule in self.config.media_keywords.values():
-                if any(term.lower() in text for term in rule.get("terms", [])):
-                    weight = max(weight, float(rule.get("weight", weight)))
-                    escalated = True
-                    break
+        if finding.category in self.config.escalate_categories:
+            hits = self.screener.screen_finding(finding)
+            if hits and hits.weight > weight:
+                weight, escalated = hits.weight, True
         return weight, escalated
 
     def assess(self, findings_with_confidence: list[tuple[Finding, float]]) -> RiskAssessment:

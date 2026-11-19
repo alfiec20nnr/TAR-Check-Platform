@@ -133,6 +133,10 @@ class BaseConnector:
     name: str = "base"
     display_name: str = "Base connector"
     description: str = ""
+    #: search priority — lower runs first where sources compete for a shared
+    #: budget (e.g. the Brave rate limit) and wins when results are
+    #: de-duplicated. Assigned by the registry from CONNECTOR_CLASSES order.
+    priority: int = 100
 
     RETRYABLE_STATUS = {408, 425, 429, 500, 502, 503, 504}
 

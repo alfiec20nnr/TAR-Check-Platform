@@ -20,24 +20,33 @@ from app.connectors.sanctions import UkSanctionsConnector
 from app.connectors.social_media import SocialMediaConnector
 from app.connectors.uk_newspapers import UkNewspapersConnector
 
+# Listed in PRIORITY ORDER (highest first). All connectors still run
+# concurrently, but priority decides:
+#   - who gets the shared Brave request budget first (1 req/s),
+#   - which copy survives when the same result comes from several sources,
+#   - the order sources are listed in results and reports.
 CONNECTOR_CLASSES: list[type[BaseConnector]] = [
-    BraveSearchConnector,
-    UkNewspapersConnector,
-    GoogleSearchConnector,
-    SocialMediaConnector,
-    NewsApiConnector,
+    BraveSearchConnector,  # 1 — general web
+    UkNewspapersConnector,  # 2 — UK national/regional press
+    NewsApiConnector,  # 3 — news coverage
+    DvlaAddConnector,  # 4 — driving licence (only with a licence number)
+    UkSanctionsConnector,  # then by severity of what each source can find
     CompaniesHouseConnector,
     InsolvencyConnector,
-    UkSanctionsConnector,
     FcaWarningConnector,
-    DvlaAddConnector,
+    SocialMediaConnector,
+    GoogleSearchConnector,  # closed to new customers; Brave covers the web
 ]
 
 
 class ConnectorRegistry:
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.connectors: list[BaseConnector] = [cls(settings) for cls in CONNECTOR_CLASSES]
+        self.connectors: list[BaseConnector] = []
+        for priority, cls in enumerate(CONNECTOR_CLASSES, start=1):
+            connector = cls(settings)
+            connector.priority = priority
+            self.connectors.append(connector)
 
     def list_metadata(self) -> list[dict]:
         return [
@@ -46,6 +55,7 @@ class ConnectorRegistry:
                 "display_name": c.display_name,
                 "description": c.description,
                 "enabled": True,
+                "priority": c.priority,
             }
             for c in self.connectors
         ]

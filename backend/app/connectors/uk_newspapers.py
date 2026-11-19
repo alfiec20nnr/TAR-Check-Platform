@@ -60,7 +60,11 @@ class UkNewspapersConnector(BaseConnector):
             for batch in self._site_batches():
                 site_filter = " OR ".join(f"site:{s}" for s in batch)
                 results += await brave_query(
-                    client, self.settings.brave_api_key, f"{name} ({site_filter})", country=country
+                    client,
+                    self.settings.brave_api_key,
+                    f"{name} ({site_filter})",
+                    country=country,
+                    priority=self.priority,
                 )
 
         findings = []

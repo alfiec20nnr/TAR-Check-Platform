@@ -3,7 +3,14 @@
 import re
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 
 _LICENCE_NUMBER_RE = re.compile(r"^[A-Z0-9]{8,18}$")
 
@@ -121,6 +128,19 @@ class SearchResultOut(BaseModel):
     location: str | None = None
     confidence: float
     risk_contribution: float
+    raw: dict | None = Field(default=None, exclude=True)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def flagged_terms(self) -> list[str]:
+        """Adverse keywords found in the record (config/adverse_keywords.yaml)."""
+        return list((self.raw or {}).get("flagged_terms") or [])
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def dob_check(self) -> str | None:
+        """Date-of-birth evidence in the record text: exact / year / age."""
+        return (self.raw or {}).get("dob_check")
 
 
 class SearchDetail(SearchOut):

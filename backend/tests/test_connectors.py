@@ -127,9 +127,9 @@ async def test_brave_connector_normalises_and_categorises():
 
 
 @respx.mock
-async def test_brave_location_adds_extra_narrowing_query(monkeypatch):
-    """A supplied location runs one extra query (name + location) on top of
-    the regular ones; without a location no such query is sent."""
+async def test_brave_query_plan_order(monkeypatch):
+    """Brave queries go: name, name + country, name + location,
+    name + country + location — then nickname variants."""
     from app.connectors import brave_search
     from app.connectors.brave_search import BraveSearchConnector
 
@@ -139,19 +139,57 @@ async def test_brave_location_adds_extra_narrowing_query(monkeypatch):
         return_value=httpx.Response(200, json={"web": {"results": []}})
     )
     connector = BraveSearchConnector(real_settings(brave_api_key="k"))
-
-    await connector.run(SUBJECT)
-    without = [httpx.QueryParams(c.request.url.query).get("q") for c in route.calls]
-    assert not any("Manchester" in q for q in without)
-
-    located = SearchSubject(full_name="Test Person", location="Manchester")
-    result = await connector.run(located)
+    subject = SearchSubject(
+        full_name="William Person", country="United Kingdom", location="Manchester"
+    )
+    result = await connector.run(subject)
     assert result.status == ConnectorStatus.SUCCESS
-    queries = [
-        httpx.QueryParams(c.request.url.query).get("q") for c in route.calls[len(without):]
+    queries = [httpx.QueryParams(c.request.url.query).get("q") for c in route.calls]
+    assert queries[:4] == [
+        "William Person",
+        "William Person United Kingdom",
+        "William Person Manchester",
+        "William Person United Kingdom Manchester",
     ]
-    assert queries[:-1] == without  # regular queries unchanged
-    assert queries[-1] == "Test Person Manchester"
+    assert "Bill Person" in queries[4:]  # nickname variants come last
+
+
+def test_brave_query_plan_skips_missing_inputs():
+    from app.connectors.brave_search import build_queries
+
+    assert build_queries(SearchSubject(full_name="Test Person")) == ["Test Person"]
+    assert build_queries(SearchSubject(full_name="Test Person", location="Leeds")) == [
+        "Test Person",
+        "Test Person Leeds",
+    ]
+    # Identical queries are only sent once.
+    same = SearchSubject(full_name="Test Person", country="Wales", location="Wales")
+    assert build_queries(same) == ["Test Person", "Test Person Wales"]
+
+
+async def test_brave_throttle_serves_highest_priority_first():
+    """Waiting connectors share the Brave budget in priority order."""
+    import asyncio
+
+    from app.connectors.brave_search import PriorityThrottle
+
+    throttle = PriorityThrottle(0.01)
+    order: list[int] = []
+
+    async def request(priority: int) -> None:
+        await throttle.acquire(priority)
+        order.append(priority)
+
+    await asyncio.gather(request(9), request(2), request(1), request(5))
+    assert order == [1, 2, 5, 9]
+
+
+def test_registry_priority_order():
+    """Brave first, UK newspapers second, News API third, DVLA fourth."""
+    registry = get_registry(Settings(mock_connectors=True))
+    names = [c.name for c in registry.connectors]
+    assert names[:4] == ["brave_search", "uk_newspapers", "news_api", "dvla_add"]
+    assert [c.priority for c in registry.connectors] == list(range(1, len(names) + 1))
 
 
 @respx.mock

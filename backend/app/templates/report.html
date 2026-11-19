@@ -94,9 +94,10 @@ as proof of identity.</p>
   <tr>
     <td>{{ r.source_name }}</td>
     <td>{{ r.category | replace("_", " ") }}</td>
-    <td><strong>{{ r.title }}</strong>{% if r.description %}<br>{{ r.description }}{% endif %}</td>
+    <td><strong>{{ r.title }}</strong>{% if r.description %}<br>{{ r.description }}{% endif %}
+      {% if r.flagged_terms %}<br><span class="meta">Flagged keywords: {{ r.flagged_terms | join(", ") }}</span>{% endif %}</td>
     <td>{{ r.event_date or "—" }}</td>
-    <td>{{ r.confidence }}% ({{ band(r.confidence) }})</td>
+    <td>{{ r.confidence }}% ({{ band(r.confidence) }}){% if r.dob_check == "exact" %}<br><span class="meta">DOB verified in record</span>{% elif r.dob_check in ("year", "age") %}<br><span class="meta">Birth year / age consistent</span>{% endif %}</td>
     <td>{% if r.url %}<a href="{{ r.url }}">source</a>{% else %}—{% endif %}</td>
   </tr>
   {% endfor %}

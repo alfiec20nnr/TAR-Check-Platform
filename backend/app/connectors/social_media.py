@@ -65,6 +65,7 @@ class SocialMediaConnector(BaseConnector):
                     self.settings.brave_api_key,
                     f"{name} site:{site}",
                     country=self.settings.brave_country or None,
+                    priority=self.priority,
                 )
             for item in results:
                 link = item.get("url") or ""
@@ -85,11 +86,7 @@ class SocialMediaConnector(BaseConnector):
                 findings.append(
                     Finding(
                         source=self.name,
-                        category=web_common.categorise(
-                            text,
-                            default=Category.SOCIAL_MEDIA,
-                            extra_terms=web_common.CONDUCT_TERMS,
-                        ),
+                        category=web_common.categorise(text, default=Category.SOCIAL_MEDIA),
                         title=title,
                         description=description or None,
                         url=link,
