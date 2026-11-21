@@ -124,6 +124,13 @@ export default function SearchForm({ compact = false }: { compact?: boolean }) {
           {submit.isPending ? "Submitting…" : "Run search"}
         </Button>
       </Stack>
+      {location.trim().length === 0 && (
+        <Alert severity="warning" sx={{ mt: 2 }}>
+          Searching without a location is less accurate — results may include
+          other people with the same name. Add a town, city or region where
+          possible.
+        </Alert>
+      )}
       {submit.isError && (
         <Alert severity="error" sx={{ mt: 2 }}>
           {submit.error.message}

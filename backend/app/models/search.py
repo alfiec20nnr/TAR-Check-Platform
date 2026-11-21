@@ -50,6 +50,10 @@ class Search(Base):
         String(16), default=SearchStatus.PENDING.value, nullable=False, index=True
     )
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Pipeline progress (0-100) and the stage currently running, so the UI
+    # can show a real progress bar while the search is in flight.
+    progress: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    progress_stage: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False, index=True

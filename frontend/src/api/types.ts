@@ -25,6 +25,10 @@ export interface SearchOut {
   created_by: string | null;
   status: SearchStatus;
   error: string | null;
+  /** Pipeline progress, 0–100. */
+  progress: number;
+  /** Stage currently running, e.g. "Querying data sources (3/9)". */
+  progress_stage: string | null;
   created_at: string;
   started_at: string | null;
   completed_at: string | null;

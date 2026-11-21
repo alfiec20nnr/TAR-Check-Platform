@@ -86,11 +86,22 @@ export default function SearchDetailPage() {
         <Grid size={12}>
           <Card variant="outlined">
             <CardContent>
-              <Typography gutterBottom>
-                Search in progress — querying data sources, matching identities and
-                generating the report…
-              </Typography>
-              <LinearProgress />
+              <Stack direction="row" justifyContent="space-between" alignItems="baseline" spacing={2}>
+                <Typography gutterBottom>
+                  {data.status === "pending"
+                    ? "Search queued — waiting to start…"
+                    : `${data.progress_stage ?? "Search in progress"}…`}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                  {data.progress ?? 0}%
+                </Typography>
+              </Stack>
+              <LinearProgress
+                variant={data.status === "pending" ? "indeterminate" : "determinate"}
+                value={data.progress ?? 0}
+                aria-label="Search progress"
+                sx={{ height: 8, borderRadius: 4 }}
+              />
             </CardContent>
           </Card>
         </Grid>

@@ -6,6 +6,7 @@ core pipeline changes.
 """
 
 import asyncio
+from collections.abc import Awaitable, Callable
 
 from app.config import Settings, get_settings
 from app.connectors.base import BaseConnector, ConnectorResult, SearchSubject
@@ -61,16 +62,34 @@ class ConnectorRegistry:
         ]
 
     async def run_all(
-        self, subject: SearchSubject, enabled_names: set[str] | None = None
+        self,
+        subject: SearchSubject,
+        enabled_names: set[str] | None = None,
+        on_progress: Callable[[int, int, str], Awaitable[None]] | None = None,
     ) -> list[ConnectorResult]:
         """Run enabled connectors concurrently; one slow/failing source never
-        blocks the others."""
+        blocks the others.
+
+        ``on_progress(done, total, connector_name)`` is awaited each time a
+        connector finishes, so callers can report progress.
+        """
         selected = [
             c
             for c in self.connectors
             if enabled_names is None or c.name in enabled_names
         ]
-        return list(await asyncio.gather(*(c.run(subject) for c in selected)))
+        total = len(selected)
+        done = 0
+
+        async def _run(connector: BaseConnector) -> ConnectorResult:
+            nonlocal done
+            result = await connector.run(subject)
+            done += 1
+            if on_progress is not None:
+                await on_progress(done, total, connector.display_name)
+            return result
+
+        return list(await asyncio.gather(*(_run(c) for c in selected)))
 
 
 def get_registry(settings: Settings | None = None) -> ConnectorRegistry:

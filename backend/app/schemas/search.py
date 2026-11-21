@@ -104,6 +104,8 @@ class SearchOut(BaseModel):
     created_by: str | None = None  # username; None on pre-multi-user rows
     status: str
     error: str | None = None
+    progress: int = 0
+    progress_stage: str | None = None
     created_at: datetime
     started_at: datetime | None = None
     completed_at: datetime | None = None

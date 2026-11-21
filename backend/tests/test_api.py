@@ -42,6 +42,12 @@ async def test_submit_search_returns_id_immediately(client):
     assert body["full_name"] == "Alice Example"
     # The submitting user is recorded and surfaced ("Run by" in the UI).
     assert body["created_by"] == "admin"
+    assert body["progress"] == 0
+    # Let the background pipeline finish so it cannot overlap the next
+    # test's schema reset; it reports progress through to 100%.
+    detail = await submit_and_wait_by_id(client, body["id"])
+    assert detail["progress"] == 100
+    assert detail["progress_stage"] == "Complete"
 
 
 async def test_validation_rejects_bad_input(client):

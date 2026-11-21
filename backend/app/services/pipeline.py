@@ -10,6 +10,7 @@ The pipeline owns its database session and always leaves the search in a
 terminal state (completed/failed).
 """
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 
@@ -58,11 +59,25 @@ async def _enabled_source_names(session: AsyncSession) -> set[str] | None:
     return {r.name for r in rows if r.enabled}
 
 
+# Share of the progress bar given to the connector stage (the slow part);
+# the remaining stages are quick and fill the rest.
+_CONNECTOR_PROGRESS_START = 5
+_CONNECTOR_PROGRESS_END = 75
+
+
+async def _set_progress(
+    session: AsyncSession, search: Search, percent: int, stage: str
+) -> None:
+    search.progress = max(search.progress or 0, min(percent, 100))
+    search.progress_stage = stage
+    await session.commit()
+
+
 async def _execute(session: AsyncSession, search: Search, settings: Settings) -> None:
     started = datetime.now(UTC)
     search.status = SearchStatus.RUNNING.value
     search.started_at = started
-    await session.commit()
+    await _set_progress(session, search, _CONNECTOR_PROGRESS_START, "Querying data sources")
 
     subject = SearchSubject(
         full_name=search.full_name,
@@ -76,7 +91,19 @@ async def _execute(session: AsyncSession, search: Search, settings: Settings) ->
     # 1. Run connectors concurrently.
     registry = get_registry(settings)
     enabled = await _enabled_source_names(session)
-    connector_results = await registry.run_all(subject, enabled)
+    # Connectors finish concurrently; serialise the progress commits because
+    # an AsyncSession must not be used by two tasks at once.
+    progress_lock = asyncio.Lock()
+
+    async def on_connector_done(done: int, total: int, name: str) -> None:
+        span = _CONNECTOR_PROGRESS_END - _CONNECTOR_PROGRESS_START
+        percent = _CONNECTOR_PROGRESS_START + int(span * done / max(total, 1))
+        async with progress_lock:
+            await _set_progress(
+                session, search, percent, f"Querying data sources ({done}/{total})"
+            )
+
+    connector_results = await registry.run_all(subject, enabled, on_connector_done)
     connector_stats = [
         {
             "connector": r.connector,
@@ -97,6 +124,8 @@ async def _execute(session: AsyncSession, search: Search, settings: Settings) ->
     findings = deduplicate(
         [f for r in connector_results for f in r.findings]
     )
+
+    await _set_progress(session, search, 78, "Screening and matching identities")
 
     # 3b. Screen every finding from every source against the broad adverse
     # keyword list. Flags and re-categorises; never discards.
@@ -151,6 +180,8 @@ async def _execute(session: AsyncSession, search: Search, settings: Settings) ->
         )
     )
 
+    await _set_progress(session, search, 82, "Generating AI summary")
+
     # 7. AI summary (falls back to a template when no API key).
     summariser = AiSummariser(settings)
     summary = await summariser.summarise(subject, scored_findings)
@@ -162,6 +193,8 @@ async def _execute(session: AsyncSession, search: Search, settings: Settings) ->
             content=summary.content,
         )
     )
+
+    await _set_progress(session, search, 92, "Generating report")
 
     # 8. Generate and store the report.
     completed = datetime.now(UTC)
@@ -213,6 +246,8 @@ async def _execute(session: AsyncSession, search: Search, settings: Settings) ->
 
     # Finalise the search row (denormalised dashboard fields included).
     search.status = SearchStatus.COMPLETED.value
+    search.progress = 100
+    search.progress_stage = "Complete"
     search.completed_at = completed
     search.duration_ms = duration_ms
     search.results_count = len(result_rows)

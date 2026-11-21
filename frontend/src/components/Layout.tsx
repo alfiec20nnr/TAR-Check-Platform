@@ -101,7 +101,15 @@ export default function Layout() {
               src="/logo.png"
               alt={`${appName} logo`}
               onError={() => setLogoOk(false)}
-              sx={{ height: 32, width: "auto", maxWidth: 160, borderRadius: 1, display: "block" }}
+              // Fills most of the toolbar height (56px mobile / 64px desktop)
+              // without enlarging the bar itself.
+              sx={{
+                height: { xs: 44, sm: 52 },
+                width: "auto",
+                maxWidth: { xs: 160, sm: 240 },
+                borderRadius: 1,
+                display: "block",
+              }}
             />
           ) : (
             <ShieldIcon color="primary" />
